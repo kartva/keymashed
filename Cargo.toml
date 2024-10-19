@@ -1,0 +1,9 @@
+[package]
+name = "run-louder"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cgroups-rs = "0.3.4"
+cpal = "0.15.3"
+nix = { version = "0.29.0", features = ["ptrace"] }
