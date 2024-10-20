@@ -32,9 +32,11 @@ pub const ChildManager = struct {
         return regs.orig_rax;
     }
 
-    fn childWaitForSyscall(cm: ChildManager) i32 {
+    fn childWaitForSyscall(cm: ChildManager) !i32 {
         var status: i32 = 0;
-        _ = c.ptrace(c.PTRACE_SYSCALL, cm.childPid, cNullPtr, cNullPtr);
+        if (c.ptrace(c.PTRACE_SYSCALL, cm.childPid, cNullPtr, cNullPtr) == -1) {
+            return ProcError.Ptrace;
+        }
         _ = c.waitpid(cm.childPid, &status, 0);
         return status;
     }
@@ -51,6 +53,7 @@ pub const ChildManager = struct {
             .syscall = @intFromEnum(std.os.linux.syscalls.X64.epoll_wait),
             .hook = pollHandler,
         },
+        // Add more syscalls to intercept here...
     };
 
     pub fn childInterceptSyscalls(
@@ -58,7 +61,8 @@ pub const ChildManager = struct {
     ) !void {
         while (true) {
             // Handle syscall entrance
-            const status = cm.childWaitForSyscall();
+            const status = try cm.childWaitForSyscall();
+            // Checking status so that our loop stops if the child exits
             if (status == 0) {
                 break;
             }
@@ -75,6 +79,6 @@ pub const ChildManager = struct {
 
     fn pollHandler(cm: *ChildManager) anyerror!void {
         std.time.sleep(mic.delay);
-        _ = cm.childWaitForSyscall();
+        _ = try cm.childWaitForSyscall();
     }
 };
