@@ -1,4 +1,5 @@
 // Adapted from https://notes.eatonphil.com/2023-10-01-intercepting-and-modifying-linux-system-calls-with-ptrace.html
+// Original is under the MIT license, by Phil Eaton
 
 const std = @import("std");
 const mic = @import("mic.zig");
