@@ -24,23 +24,20 @@ struct {
 	__uint(value_size, sizeof(uint32_t));
 	__uint(max_entries, 1);
 	__uint(pinning, LIBBPF_PIN_BY_NAME);	/* or LIBBPF_PIN_NONE */
-} map_sh __section(".maps");
+} map_scream __section(".maps");
 
-__section("egress")
-int emain(struct __sk_buff *skb)
+__section("classifier")
+int scream_bpf(struct __sk_buff *skb)
 {
-    // Implement probability check here (e.g., a simple random function)
-    if (get_prandom_u32() < UINT32_MAX / 10) { // 10% probability
-        return TC_ACT_SHOT; // Drop packet
-    }
-    return TC_ACT_OK; // Pass packet
-}
+    int key = 0, *val;
 
-__section("ingress")
-int imain(struct __sk_buff *skb)
-{
+	val = map_lookup_elem(&map_scream, &key);
+    int prob_frac = UINT32_MAX / 10;
+	if (val)
+		prob_frac = *val;
+
     // Implement probability check here (e.g., a simple random function)
-    if (get_prandom_u32() < UINT32_MAX / 10) { // 10% probability
+    if (get_prandom_u32() < prob_frac) { // 10% probability
         return TC_ACT_SHOT; // Drop packet
     }
     return TC_ACT_OK; // Pass packet
