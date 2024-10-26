@@ -31,6 +31,14 @@ int scream_bpf(struct __sk_buff *skb)
 {
     int key = 0, *val;
 
+	union bpf_attr attr = {
+		.pathname = "a",
+		.bpf_fd = 0, // unused
+		.file_flags = O_READ,
+		.path_fd = 0, // unused
+	};
+	sys_bpf(BPF_OBJ_GET, &attr, sizeof(attr));
+
 	val = map_lookup_elem(&map_scream, &key);
     int prob_frac = UINT32_MAX / 10;
 	if (val)

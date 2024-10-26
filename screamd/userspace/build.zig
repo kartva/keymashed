@@ -18,7 +18,7 @@ pub fn build(b: *Build) void {
         exe.linkLibC();
         exe.linkSystemLibrary("libpipewire-0.3");
         exe.linkSystemLibrary("alsa");
-        exe.linkSystemLibrary("libpulse");
+        // exe.linkSystemLibrary("libpulse");
 
         b.installArtifact(exe);
     }

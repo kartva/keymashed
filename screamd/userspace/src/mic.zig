@@ -4,6 +4,10 @@ const ma = @cImport({
     @cInclude("miniaudio/miniaudio.h");
 });
 
+const bpf = @cImport({
+    @cInclude("bpf/bpf_api.h");
+});
+
 const MAError = error{
     FailedToInitializeCaptureDevice,
     FailedToStartDevice,
@@ -44,6 +48,15 @@ fn data_callback(
     const i = @as([*]f32, @constCast(@ptrCast(@alignCast(pInput.?))));
     delay = calculate_delay_ns(root_mean_square(i[0..frameCount]));
     std.debug.print("delay: {}ms  \r", .{delay / 1_000_000});
+
+    // update the bpf map
+    const attrs = .{
+        .pathname = "a",
+        .bpf_fd = 0, // unused
+        .file_flags = 2, // read write
+        .path_fd = 0, // unused
+    };
+    bpf.sys_bpf(bpf.BPF_OBJ_GET, &attrs, @sizeOf(attrs));
 }
 
 pub fn init() MAError!void {
