@@ -24,6 +24,7 @@
         devShells.default = mkShell {
           buildInputs = [
             zig
+            libbpf-dev
             alsaLib.dev
             pulseaudio.dev
             pipewire.dev

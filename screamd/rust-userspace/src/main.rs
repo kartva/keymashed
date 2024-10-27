@@ -1,5 +1,6 @@
 use cpal::traits::{HostTrait, DeviceTrait, StreamTrait};
 use cpal::{SampleRate, StreamConfig};
+use libbpf_rs::{ObjectBuilder, OpenObject};
 use std::sync::atomic::AtomicU64;
 
 use nix::libc::{open, O_DIRECT, O_RDWR};
@@ -41,15 +42,6 @@ fn main() {
     }, err_fn, None).unwrap();
 
     stream.play().unwrap();
-
-    unsafe {
-        let fd = open("/sys/fs/bpf/tc/globals/map_sh".as_ptr() as *const i8, O_DIRECT, O_RDWR);
-        if fd < 0 {
-            eprintln!("Failed to open BPF map: {}", fd);
-        }
-
-        sysca
-    }
 
     drop(stream);
 }

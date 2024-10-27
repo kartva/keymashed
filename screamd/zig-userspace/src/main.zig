@@ -12,7 +12,8 @@ pub fn main() !u8 {
         return 1;
     }
 
-    // If we're in the parent process, start intercepting syscalls and inserting delay
     try mic.init();
+
+    _ = std.os.linux.pause();
     return 0;
 }

@@ -23,24 +23,16 @@ struct {
 	__uint(key_size, sizeof(uint32_t));
 	__uint(value_size, sizeof(uint32_t));
 	__uint(max_entries, 1);
-	__uint(pinning, LIBBPF_PIN_BY_NAME);	/* or LIBBPF_PIN_NONE */
-} map_scream __section(".maps");
+	__uint(pinning, LIBBPF_PIN_BY_NAME);	/* or LIBBPF_PIN_NONE */ // PIN_BY_NAME ensures that the map is pinned in /sys/fs/bpf
+} map_scream __section(".maps"); // synchronize this map name with userspace program
 
 __section("classifier")
 int scream_bpf(struct __sk_buff *skb)
 {
-    int key = 0, *val;
-
-	union bpf_attr attr = {
-		.pathname = "a",
-		.bpf_fd = 0, // unused
-		.file_flags = O_READ,
-		.path_fd = 0, // unused
-	};
-	sys_bpf(BPF_OBJ_GET, &attr, sizeof(attr));
+    uint32_t key = 0, *val;
 
 	val = map_lookup_elem(&map_scream, &key);
-    int prob_frac = UINT32_MAX / 10;
+    int prob_frac = 0;
 	if (val)
 		prob_frac = *val;
 

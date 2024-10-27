@@ -13,7 +13,12 @@ pub fn build(b: *Build) void {
             .optimize = optimize,
         });
         exe.addIncludePath(b.path("src/include"));
+
+        exe.root_module.addCMacro("MA_ENABLE_ONLY_SPECIFIC_BACKENDS", "");
+        exe.root_module.addCMacro("MA_ENABLE_ALSA", "");
         exe.addCSourceFile(.{ .file = b.path("src/include/miniaudio/miniaudio.c") });
+        exe.addLibraryPath(b.path("src/include/libbpf/src/"));
+        exe.linkSystemLibrary("bpf");
 
         exe.linkLibC();
         exe.linkSystemLibrary("libpipewire-0.3");
