@@ -1,6 +1,7 @@
 const std = @import("std");
 const Instant = std.time.Instant;
 const Timer = std.time.Timer;
+const Mutex = std.Thread.Mutex;
 
 const ev = @cImport({
     @cInclude("libevdev-1.0/libevdev/libevdev.h");
@@ -51,6 +52,7 @@ fn root_mean_square(buf: []f32) f32 {
 }
 
 var timer: Timer = undefined;
+var mt: Mutex = Mutex{};
 
 fn observe_delay() !void {
     const path = "/dev/input/event0";
@@ -60,7 +62,9 @@ fn observe_delay() !void {
     while (true) {
         var b: ev.input_event = undefined;
         _ = try std.posix.read(fd, std.mem.asBytes(&b));
+        mt.lock();
         timer.reset();
+        mt.unlock();
     }
 }
 
@@ -75,9 +79,11 @@ pub fn main() !u8 {
     _ = try std.Thread.spawn(.{}, observe_delay, .{});
 
     while (true) {
+        mt.lock();
         std.log.debug("Time elapsed is: {d:.3}ms\n", .{
             timer.read() / std.time.ns_per_ms,
         });
+        mt.unlock();
         std.time.sleep(100 * std.time.ns_per_ms);
     }
     return 0;
