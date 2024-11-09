@@ -80,7 +80,7 @@ pub fn main() !u8 {
         var evv: ev.input_event = undefined;
         const res = ev.libevdev_next_event(evdev, ev.LIBEVDEV_READ_FLAG_NORMAL, &evv);
 
-        if (res == errno.EAGAIN) {
+        if (res == c.EAGAIN) {
             continue; // No new event available, non-blocking
         } else if (res < 0) {
             std.debug.print("Error reading event\n", .{});
