@@ -2,7 +2,6 @@
 // Original is under the MIT license, by Phil Eaton
 
 const std = @import("std");
-const mic = @import("mic.zig");
 const c = @cImport({
     @cInclude("sys/ptrace.h");
     @cInclude("sys/user.h");
@@ -79,7 +78,7 @@ pub const ChildManager = struct {
     }
 
     fn pollHandler(cm: *ChildManager) anyerror!void {
-        std.time.sleep(mic.delay);
+        // std.time.sleep(mic.delay);
         _ = try cm.childWaitForSyscall();
     }
 };
