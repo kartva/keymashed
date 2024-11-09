@@ -4,6 +4,10 @@ const ev = @cImport({
     @cInclude("libevdev-1.0/libevdev/libevdev.h");
 });
 
+const errno = @cImport({
+    @cInclude("errno.h");
+});
+
 const c = @cImport({
     @cInclude("stdio.h");
     @cInclude("stdlib.h");
