@@ -58,8 +58,8 @@ fn observe_delay() !void {
     defer std.posix.close(fd);
 
     while (true) {
-        var b: [96]u8 = undefined;
-        _ = try std.posix.read(fd, &b);
+        var b: ev.input_event = undefined;
+        _ = try std.posix.read(fd, std.mem.asBytes(&b));
         timer.reset();
     }
 }
