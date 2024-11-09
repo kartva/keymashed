@@ -1,5 +1,6 @@
 const std = @import("std");
 const Instant = std.time.Instant;
+const Timer = std.time.Timer;
 
 const ev = @cImport({
     @cInclude("libevdev-1.0/libevdev/libevdev.h");
@@ -49,23 +50,17 @@ fn root_mean_square(buf: []f32) f32 {
     return std.math.sqrt(sum / @as(f32, @floatFromInt(buf.len)));
 }
 
-var ns: f64 = 0.0;
+var timer: Timer = undefined;
 
 fn observe_delay() !void {
-    const path = "/dev/input/mouse2";
-    const bytes_per_read = 3;
-    const f = std.fs.openFileAbsolute(path, .{ .mode = .read_only }) catch |err| {
-        std.debug.print("Failed to open device file: {s}\n", .{@errorName(err)});
-        return MAError.FileOpenError;
-    };
-    defer f.close();
+    const path = "/dev/input/event0";
+    const fd = try std.posix.open(path, .{}, 0);
+    defer std.posix.close(fd);
 
     while (true) {
-        const start = try Instant.now();
-        var b: [bytes_per_read]u8 = undefined;
-        _ = try f.read(&b);
-        const end = try Instant.now();
-        ns = @floatFromInt(end.since(start));
+        var b: [96]u8 = undefined;
+        _ = try std.posix.read(fd, &b);
+        timer.reset();
     }
 }
 
@@ -74,12 +69,14 @@ var bpf_map_fd: c_int = -1;
 pub fn main() !u8 {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
+    timer = try Timer.start();
+    timer.reset();
 
     _ = try std.Thread.spawn(.{}, observe_delay, .{});
 
     while (true) {
         std.log.debug("Time elapsed is: {d:.3}ms\n", .{
-            ns / std.time.ns_per_ms,
+            timer.read() / std.time.ns_per_ms,
         });
         std.time.sleep(100 * std.time.ns_per_ms);
     }
