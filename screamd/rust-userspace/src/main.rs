@@ -4,10 +4,10 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
     layout::{self, Layout, Rect},
-    style::Stylize,
-    symbols::border,
+    style::{Color, Style, Stylize},
+    symbols::{self, border},
     text::{Line, Text},
-    widgets::{self, Block, Paragraph, Widget, Wrap},
+    widgets::{self, Axis, Block, Chart, Dataset, Paragraph, Widget, Wrap},
     DefaultTerminal, Frame,
 };
 
@@ -23,14 +23,14 @@ fn from_string_to_type_result(s: String) -> Vec<(char, TypeResult)> {
     s.chars().map(|c| (c, TypeResult::NotTypedYet)).collect()
 }
 
-pub const SPARKLINE_DATA_LENGTH: usize = 1000;
+pub const CHART_DATA_LENGTH: usize = 1000;
 
 #[derive(Debug)]
 pub struct App {
     exit: bool,
     test_string: Vec<(char, TypeResult)>,
     correct_stroke_window: VecDeque<Instant>,
-    sparkline: VecDeque<u64>,
+    chart_data: VecDeque<f64>, // (wpm)
     cursor_position: usize,
 }
 
@@ -49,33 +49,55 @@ impl Widget for &App {
         let chunks = Layout::default()
             .direction(layout::Direction::Horizontal)
             .constraints([
-                layout::Constraint::Percentage(20),
-                layout::Constraint::Percentage(80),
+                layout::Constraint::Percentage(40),
+                layout::Constraint::Percentage(60),
             ])
             .split(block.inner(area));
 
-        let current_wpm = self.sparkline.back().unwrap_or(&0);
+        let current_wpm = self.chart_data.back().unwrap_or(&0.0);
 
-        // Calculate available width for sparkline
-        let sparkline_area = chunks[0];
-        let available_width = sparkline_area.width.saturating_sub(4) as usize; // Subtract for borders
-        let start_idx = self.sparkline.len().saturating_sub(available_width);
-        
-        let data = self.sparkline.iter().skip(start_idx).copied().collect::<Vec<_>>();
-        let sparkline = widgets::Sparkline::default()
-            .block(Block::bordered().title(format!(" WPM: {} ", current_wpm)))
-            .data(&data)
-            .style(ratatui::style::Style::default().blue());
+        let chart_area = chunks[0];
+        let available_width = chart_area.width.saturating_sub(4) as usize;
+        let start_idx = self.chart_data.len().saturating_sub(available_width);
 
-        let counter_text = Text::from(vec![Line::from(self.test_string.iter().map(|(c, tr)| {
-            match tr {
+        let data = self.chart_data.iter().skip(start_idx)
+                        .copied().enumerate().map(|(i, y)| (i as f64, y)).collect::<Vec<_>>();
+
+        // Create the line chart
+        let dataset = Dataset::default()
+            .name("WPM")
+            .marker(symbols::Marker::Braille)
+            .style(Style::default().fg(Color::Cyan))
+            .graph_type(widgets::GraphType::Line)
+            .data(&data);
+
+        let chart = Chart::new(vec![dataset])
+            .block(Block::bordered().title(format!(" WPM: {} ", current_wpm)).border_set(border::ROUNDED))
+            .x_axis(
+                Axis::default()
+                    .style(Style::default().fg(Color::Gray))
+                    .bounds([1.0, available_width as f64])
+            )
+            .y_axis(
+                Axis::default()
+                    .style(Style::default().fg(Color::Gray))
+                    .bounds([0.0, 150.0])
+            );
+
+        let counter_text = Text::from(vec![Line::from(self.test_string.iter().enumerate().map(|(i, (c, tr))| {
+            let ch = match tr {
                 TypeResult::NotTypedYet => c.to_string().dim(),
                 TypeResult::Correct => c.to_string().green(),
-                TypeResult::Incorrect => c.to_string().red(),
+                TypeResult::Incorrect => c.to_string().red()
+            };
+            if i == self.cursor_position {
+                ch.underlined()
+            } else {
+                ch
             }
         }).collect::<Vec<_>>())]);
 
-        let par_block_title = Line::from(" AffirmType2000 ".bold());
+        let par_block_title = Line::from(" Text ".bold());
         let par_block = Block::bordered()
             .title(par_block_title.centered())
             .border_set(border::THICK);
@@ -86,7 +108,7 @@ impl Widget for &App {
             .block(par_block);
 
         block.render(area, buf);
-        sparkline.render(chunks[0], buf);
+        chart.render(chunks[0], buf);
         typing_paragraph.render(chunks[1], buf);
     }
 }
@@ -96,28 +118,24 @@ impl App {
         Self {
             exit: false,
             test_string: from_string_to_type_result(string),
-            sparkline: VecDeque::new(),
+            chart_data: VecDeque::new(),
             correct_stroke_window: VecDeque::new(),
             cursor_position: 0,
         }
     }
 
-    /// runs the application's main loop until the user quits
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
             if event::poll(Duration::from_millis(100))? {
                 match event::read()? {
-                    // it's important to check that the event is a key press event as
-                    // crossterm also emits key release and repeat events on Windows.
                     Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                         self.handle_key_event(key_event)
                     }
                     _ => {}
                 };
             }
-            // update sparkline every 100ms
-            self.update_sparkline();
+            self.update_chart();
         }
         Ok(())
     }
@@ -126,31 +144,30 @@ impl App {
         self.exit = true;
     }
 
-    /// updates the stroke window to only contain strokes that have occurred in the last 60 seconds
     fn update_stroke_window(&mut self) {
         let now = Instant::now();
-        let window_duration = Duration::from_secs(60);
+        let window_duration = Duration::from_secs(3);
         while self.correct_stroke_window.front().map_or(false, |t| now.duration_since(*t) > window_duration) {
             self.correct_stroke_window.pop_front();
         }
     }
 
-    /// calculates the words per minute based on the number of strokes in the stroke window
-    fn calculate_wpm(&self) -> u64 {
-        (self.correct_stroke_window.len() as u64) / 2
+    fn calculate_wpm(&self) -> f64 {
+        ((self.correct_stroke_window.len() as f64) * 20.0) / 5.0
     }
 
-    /// calculates WPM and updates the sparkline
-    pub fn update_sparkline(&mut self) {
+    pub fn update_chart(&mut self) {
         self.update_stroke_window();
-        self.sparkline.push_back(self.calculate_wpm());
-        while self.sparkline.len() > SPARKLINE_DATA_LENGTH {
-            self.sparkline.pop_front();
+        let wpm = self.calculate_wpm();
+        
+        self.chart_data.push_back(wpm);
+        
+        // Keep only the last CHART_DATA_LENGTH points
+        while self.chart_data.len() > CHART_DATA_LENGTH {
+            self.chart_data.pop_front();
         }
     }
 
-    /// receives a character stroke and updates the test string
-    /// and updates the stroke window if the stroke was correct
     fn receive_char_stroke(&mut self, c: char) {
         if self.cursor_position < self.test_string.len() {
             if self.test_string[self.cursor_position].0 == c {
