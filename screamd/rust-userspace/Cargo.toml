@@ -3,10 +3,6 @@ name = "run-louder"
 version = "0.1.0"
 edition = "2021"
 
-[build-dependencies]
-bindgen = "0.65.1"
-
 [dependencies]
-cpal = "0.15.3"
-libbpf-rs = "0.24.6"
-nix = { version = "0.29.0", features = ["ptrace"] }
+crossterm = "0.28.1"
+ratatui = "0.29.0"
