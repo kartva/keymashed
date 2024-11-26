@@ -1,6 +1,0 @@
-.{
-    .name = "syscall",
-    .version = "0.0.0",
-    .minimum_zig_version = "0.13.0",
-    .paths = .{""},
-}
