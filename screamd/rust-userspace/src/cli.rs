@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, io, sync::mpsc::{SendError, SyncSender}, time::{Duration, Instant}};
+use std::{collections::VecDeque, io, sync::mpsc::SyncSender, time::{Duration, Instant}};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{

@@ -1,9 +1,10 @@
+#![feature(generic_const_exprs)]
+#![feature(mapped_lock_guards)]
+
 mod bpf;
 mod cli;
 mod multimedia;
 mod rtp;
-
-use std::sync::mpsc::sync_channel;
 
 use simplelog::WriteLogger;
 use log;
@@ -29,7 +30,7 @@ fn main () -> std::io::Result<()> {
     // cli::main(sender)
 
     std::thread::spawn(|| {
-        rtp::send_reordered_packets();
+        rtp::send_audio();
     });
 
     rtp::play_audio();

@@ -13,3 +13,4 @@ rand = "0.8.5"
 ratatui = "0.29.0"
 sdl2 = { version = "0.37.0", features = ["image"] }
 simplelog = "0.12.2"
+zerocopy = { version = "0.8.11", features = ["derive"] }
