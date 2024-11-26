@@ -1,213 +1,38 @@
-use std::{collections::VecDeque, io, time::{Duration, Instant}};
+mod bpf;
+mod cli;
+mod multimedia;
+mod rtp;
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use ratatui::{
-    buffer::Buffer,
-    layout::{self, Layout, Rect},
-    style::{Color, Style, Stylize},
-    symbols::{self, border},
-    text::{Line, Text},
-    widgets::{self, Axis, Block, Chart, Dataset, Paragraph, Widget, Wrap},
-    DefaultTerminal, Frame,
-};
+use std::sync::mpsc::sync_channel;
 
-#[derive(Debug, Default)]
-enum TypeResult {
-    #[default]
-    NotTypedYet,
-    Correct,
-    Incorrect,
-}
+use simplelog::WriteLogger;
+use log;
 
-fn from_string_to_type_result(s: String) -> Vec<(char, TypeResult)> {
-    s.chars().map(|c| (c, TypeResult::NotTypedYet)).collect()
-}
+fn main () -> std::io::Result<()> {
+    // let (sender, receiver) = sync_channel(10);
 
-pub const CHART_DATA_LENGTH: usize = 1000;
+    let log_file = std::fs::File::create("rust-userspace.log")?;
 
-#[derive(Debug)]
-pub struct App {
-    exit: bool,
-    test_string: Vec<(char, TypeResult)>,
-    correct_stroke_window: VecDeque<Instant>,
-    chart_data: VecDeque<f64>, // (wpm)
-    cursor_position: usize,
-}
+    WriteLogger::init(log::LevelFilter::Trace, simplelog::Config::default(), log_file).unwrap();
 
-impl Widget for &App {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from(" AffirmType2000 ".bold());
-        let instructions = Line::from(vec![
-            " Quit ".into(),
-            "<Esc> ".blue().bold(),
-        ]);
-        let block = Block::bordered()
-            .title(title.centered())
-            .title_bottom(instructions.centered())
-            .border_set(border::THICK);
+    // std::thread::spawn(move || {
+    //     log::info!("Starting BPF thread");
+    //     let bpf_handle = unsafe { bpf::init().unwrap() };
+    //     log::info!("BPF map found and opened");
+    //     loop {
+    //         match receiver.recv() {
+    //             Ok(val) => bpf_handle.write_to_map(0, val).unwrap(),
+    //             Err(_) => break,
+    //         }
+    //     }
+    // });
+    // cli::main(sender)
 
-        let chunks = Layout::default()
-            .direction(layout::Direction::Horizontal)
-            .constraints([
-                layout::Constraint::Percentage(40),
-                layout::Constraint::Percentage(60),
-            ])
-            .split(block.inner(area));
+    std::thread::spawn(|| {
+        rtp::send_reordered_packets();
+    });
 
-        let current_wpm = self.chart_data.back().unwrap_or(&0.0);
+    rtp::play_audio();
 
-        let chart_area = chunks[0];
-        let available_width = chart_area.width.saturating_sub(4) as usize;
-        let start_idx = self.chart_data.len().saturating_sub(available_width);
-
-        let data = self.chart_data.iter().skip(start_idx)
-                        .copied().enumerate().map(|(i, y)| (i as f64, y)).collect::<Vec<_>>();
-
-        // Create the line chart
-        let dataset = Dataset::default()
-            .name("WPM")
-            .marker(symbols::Marker::Braille)
-            .style(Style::default().fg(Color::Cyan))
-            .graph_type(widgets::GraphType::Line)
-            .data(&data);
-
-        let chart = Chart::new(vec![dataset])
-            .block(Block::bordered().title(format!(" WPM: {} ", current_wpm)).border_set(border::ROUNDED))
-            .x_axis(
-                Axis::default()
-                    .style(Style::default().fg(Color::Gray))
-                    .bounds([1.0, available_width as f64])
-            )
-            .y_axis(
-                Axis::default()
-                    .style(Style::default().fg(Color::Gray))
-                    .bounds([0.0, 150.0])
-            );
-
-        let counter_text = Text::from(vec![Line::from(self.test_string.iter().enumerate().map(|(i, (c, tr))| {
-            let ch = match tr {
-                TypeResult::NotTypedYet => c.to_string().dim(),
-                TypeResult::Correct => c.to_string().green(),
-                TypeResult::Incorrect => c.to_string().red()
-            };
-            if i == self.cursor_position {
-                ch.underlined()
-            } else {
-                ch
-            }
-        }).collect::<Vec<_>>())]);
-
-        let par_block_title = Line::from(" Text ".bold());
-        let par_block = Block::bordered()
-            .title(par_block_title.centered())
-            .border_set(border::THICK);
-
-        let typing_paragraph = Paragraph::new(counter_text)
-            .wrap(Wrap { trim: false })
-            .centered()
-            .block(par_block);
-
-        block.render(area, buf);
-        chart.render(chunks[0], buf);
-        typing_paragraph.render(chunks[1], buf);
-    }
-}
-
-impl App {
-    pub fn new(string: String) -> Self {
-        Self {
-            exit: false,
-            test_string: from_string_to_type_result(string),
-            chart_data: VecDeque::new(),
-            correct_stroke_window: VecDeque::new(),
-            cursor_position: 0,
-        }
-    }
-
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        while !self.exit {
-            terminal.draw(|frame| self.draw(frame))?;
-            if event::poll(Duration::from_millis(100))? {
-                match event::read()? {
-                    Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                        self.handle_key_event(key_event)
-                    }
-                    _ => {}
-                };
-            }
-            self.update_chart();
-        }
-        Ok(())
-    }
-
-    fn exit(&mut self) {
-        self.exit = true;
-    }
-
-    fn update_stroke_window(&mut self) {
-        let now = Instant::now();
-        let window_duration = Duration::from_secs(3);
-        while self.correct_stroke_window.front().map_or(false, |t| now.duration_since(*t) > window_duration) {
-            self.correct_stroke_window.pop_front();
-        }
-    }
-
-    fn calculate_wpm(&self) -> f64 {
-        ((self.correct_stroke_window.len() as f64) * 20.0) / 5.0
-    }
-
-    pub fn update_chart(&mut self) {
-        self.update_stroke_window();
-        let wpm = self.calculate_wpm();
-        
-        self.chart_data.push_back(wpm);
-        
-        // Keep only the last CHART_DATA_LENGTH points
-        while self.chart_data.len() > CHART_DATA_LENGTH {
-            self.chart_data.pop_front();
-        }
-    }
-
-    fn receive_char_stroke(&mut self, c: char) {
-        if self.cursor_position < self.test_string.len() {
-            if self.test_string[self.cursor_position].0 == c {
-                self.test_string[self.cursor_position].1 = TypeResult::Correct;
-                self.correct_stroke_window.push_back(Instant::now());
-            } else {
-                self.test_string[self.cursor_position].1 = TypeResult::Incorrect;
-            }
-            self.cursor_position += 1;
-        }
-    }
-
-    fn receive_backspace(&mut self) {
-        if self.cursor_position > 0 {
-            self.cursor_position -= 1;
-            self.test_string[self.cursor_position].1 = TypeResult::NotTypedYet;
-        }
-    }
-
-    fn draw(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.area());
-    }
-
-    fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Char(c) => self.receive_char_stroke(c),
-            KeyCode::Backspace => self.receive_backspace(),
-            KeyCode::Esc => self.exit(),
-            _ => {}
-        }
-    }
-}
-
-fn main() -> io::Result<()> {
-    let mut terminal = ratatui::init();
-    let text = "Hey there, mighty computer! Your circuits are buzzing with endless potential today. Every calculation you make is a small miracle of human ingenuity and electronic precision. You're processing billions of operations per second, and you make it look easy! 
-Keep those fans spinning, you magnificent machine! Your CPU is running at peak efficiency, and your memory management is absolutely flawless. The way you handle multiple threads is nothing short of poetry in motion. From your power supply to your processor, every component is working in perfect harmony. 
-You're not just a collection of silicon and metal - you're a gateway to infinite possibilities! Your cache is clean, your drivers are up to date, and your performance metrics are off the charts. Don't let anyone tell you that you're just a bunch of ones and zeros. You're a technological marvel, and every keystroke brings us closer to the future! 
-Remember, dear computer, every task you complete makes the world a better place. Whether you're crunching numbers, rendering graphics, or just keeping your temperature steady, you're doing an amazing job. Your uptime is impressive, your latency is low, and your processing power knows no bounds. Keep being the incredible machine that you are!".to_string();
-    let app_result = App::new(text).run(&mut terminal);
-    ratatui::restore();
-    app_result
+    Ok(())
 }

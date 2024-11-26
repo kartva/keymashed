@@ -1,14 +1,7 @@
 const std = @import("std");
-const Instant = std.time.Instant;
-const Timer = std.time.Timer;
-const Mutex = std.Thread.Mutex;
 
 const ev = @cImport({
     @cInclude("libevdev-1.0/libevdev/libevdev.h");
-});
-
-const errno = @cImport({
-    @cInclude("errno.h");
 });
 
 const c = @cImport({
@@ -51,40 +44,61 @@ fn root_mean_square(buf: []f32) f32 {
     return std.math.sqrt(sum / @as(f32, @floatFromInt(buf.len)));
 }
 
-var timer: Timer = undefined;
-var mt: Mutex = Mutex{};
-
-fn observe_delay() !void {
-    const path = "/dev/input/event0";
-    const fd = try std.posix.open(path, .{}, 0);
-    defer std.posix.close(fd);
-
-    while (true) {
-        var b: ev.input_event = undefined;
-        _ = try std.posix.read(fd, std.mem.asBytes(&b));
-        mt.lock();
-        timer.reset();
-        mt.unlock();
-    }
-}
-
 var bpf_map_fd: c_int = -1;
 
 pub fn main() !u8 {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    timer = try Timer.start();
-    timer.reset();
 
-    _ = try std.Thread.spawn(.{}, observe_delay, .{});
+    const map_path = "/sys/fs/bpf/tc/globals/map_scream";
+    std.log.debug("opening ebpf map at {s}", .{map_path});
+    bpf_map_fd = bpf.bpf_obj_get(map_path);
+    if (bpf_map_fd < 0) {
+        std.debug.print("Failed to get BPF map with err: {}\n", .{bpf_map_fd});
+        return MAError.FailedToOpenBPFMap;
+    }
+
+    const device_path = "/dev/input/mouse1"; // Replace with your actual device file
+    const fd = std.fs.openFileAbsolute(device_path, .{ .mode = .read_only }) catch |err| {
+        std.debug.print("Failed to open device file: {s}\n", .{@errorName(err)});
+        return MAError.FileOpenError;
+    };
+    defer fd.close();
+
+    // Initialize libevdev
+    const evdev: ?*ev.struct_libevdev = ev.libevdev_new();
+    defer ev.libevdev_free(evdev);
+
+    if (ev.libevdev_set_fd(evdev, fd.handle) != 0) {
+        
+        return MAError.UnableToSetFd;
+    }
+
+    std.debug.print("Device: {s}\n", .{ev.libevdev_get_name(evdev)});
 
     while (true) {
-        mt.lock();
-        std.log.debug("Time elapsed is: {d:.3}ms\n", .{
-            timer.read() / std.time.ns_per_ms,
-        });
-        mt.unlock();
-        std.time.sleep(100 * std.time.ns_per_ms);
+        var evv: ev.input_event = undefined;
+        const res = ev.libevdev_next_event(evdev, ev.LIBEVDEV_READ_FLAG_NORMAL, &evv);
+
+        if (res == c.EAGAIN) {
+            continue; // No new event available, non-blocking
+        } else if (res < 0) {
+            std.debug.print("Error reading event\n", .{});
+            break;
+        }
+
+        var drop_amt: u32 = 100000;
+        std.debug.print("drop ratio: {}%  \r", .{(drop_amt / std.math.maxInt(@TypeOf(drop_amt))) * 100});
+
+        const key: u32 = 0;
+
+        const err = bpf.bpf_map_update_elem(bpf_map_fd, &key, &drop_amt, bpf.BPF_ANY);
+        if (err != 0) {
+            std.debug.print("Failed to update BPF map with err: {}\n", .{err});
+        }
     }
+
+    std.log.debug("started listening", .{});
+
     return 0;
 }

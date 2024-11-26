@@ -20,7 +20,7 @@
 
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__uint(key_size, sizeof(uint32_t));
+	__uint(key_size, sizeof(uint32_t)); 
 	__uint(value_size, sizeof(uint32_t));
 	__uint(max_entries, 1);
 	__uint(pinning, LIBBPF_PIN_BY_NAME);	/* or LIBBPF_PIN_NONE */ // PIN_BY_NAME ensures that the map is pinned in /sys/fs/bpf
