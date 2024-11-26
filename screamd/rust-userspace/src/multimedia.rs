@@ -1,4 +1,4 @@
-use sdl2::{self, audio, pixels::{PixelFormat, PixelFormatEnum}};
+use sdl2::{self, pixels::PixelFormatEnum};
 
 fn init() {
     let sdl_context = sdl2::init().unwrap();
@@ -11,7 +11,7 @@ fn init() {
 
     let texture_creator = renderer.texture_creator();
     let (width, height) = (256, 256);
-    let mut texture = texture_creator.create_texture_streaming(PixelFormatEnum::RGB888, width, height).unwrap();
+    let texture = texture_creator.create_texture_streaming(PixelFormatEnum::RGB888, width, height).unwrap();
     // texture.
 }
 

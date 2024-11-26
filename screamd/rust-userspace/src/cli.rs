@@ -89,7 +89,7 @@ impl App {
         self.update_stroke_window();
         let wpm = self.calculate_wpm();
         let drop_amt = wpm_to_drop_amt(wpm);
-        if let Err(_) = self.write_channel.send(drop_amt) {
+        if self.write_channel.send(drop_amt).is_err() {
             log::error!("Failed to send packet drop rate to BPF map, exiting.");
             self.exit();
         }

@@ -7,7 +7,6 @@ mod multimedia;
 mod rtp;
 
 use simplelog::WriteLogger;
-use log;
 
 fn main () -> std::io::Result<()> {
     // let (sender, receiver) = sync_channel(10);
