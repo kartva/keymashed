@@ -1,5 +1,4 @@
 #![feature(generic_const_exprs)]
-#![feature(mapped_lock_guards)]
 
 mod bpf;
 mod cli;
@@ -9,8 +8,6 @@ mod rtp;
 use simplelog::WriteLogger;
 
 fn main () -> std::io::Result<()> {
-    // let (sender, receiver) = sync_channel(10);
-
     let log_file = std::fs::File::create("rust-userspace.log")?;
 
     WriteLogger::init(log::LevelFilter::Trace, simplelog::Config::default(), log_file).unwrap();

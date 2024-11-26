@@ -1,0 +1,1 @@
+This Rust project requires nightly Rust to compile.

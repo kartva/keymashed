@@ -127,12 +127,6 @@ impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Send + 'static + De
 fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug> (sock: UdpSocket, recv: Arc<Mutex<RtpStateInner<T>>>) where [(); size_of_packet::<T>()]: Sized {
     sock.set_nonblocking(false).unwrap();
     log::info!("Receiver started listening on {:?}.", sock.local_addr());
-    // upto 1024 packets are allowed in the queue
-    // 44100 samples per second
-    // 2048 samples per packet
-    // 44100 / 2048 = 21.53 audio packets per second
-    // 2048 / 44100 = ~0.0463 seconds of audio per packet
-    // 1024 packets => 1024 / 21.53 = 47.6 seconds of audio
 
     loop {
         // wait until socket has a packet to read

@@ -1,6 +1,0 @@
-{
-    "files.associations": {
-        "bpf_api.h": "c",
-        "byteorder.h": "c"
-    }
-}
