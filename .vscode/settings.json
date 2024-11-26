@@ -1,6 +1,6 @@
 {
     "rust-analyzer.linkedProjects": [
-        "screamd/rust-userspace/Cargo.toml"
+        "rust-userspace/Cargo.toml"
     ],
     "files.associations": {
         "bpf_api.h": "c",
