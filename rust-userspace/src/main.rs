@@ -4,17 +4,21 @@ mod bpf;
 mod cli;
 mod rtp;
 
-use sdl2::{self, pixels::PixelFormatEnum};
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
-use zerocopy::big_endian::F32;
+use sdl2::{self, pixels::PixelFormatEnum};
 use std::time::Duration;
 
 use simplelog::WriteLogger;
 
-fn main () -> std::io::Result<()> {
+fn main() -> std::io::Result<()> {
     let log_file = std::fs::File::create("rust-userspace.log")?;
 
-    WriteLogger::init(log::LevelFilter::Trace, simplelog::Config::default(), log_file).unwrap();
+    WriteLogger::init(
+        log::LevelFilter::Trace,
+        simplelog::Config::default(),
+        log_file,
+    )
+    .unwrap();
 
     // std::thread::spawn(move || {
     //     log::info!("Starting BPF thread");
@@ -52,8 +56,8 @@ fn main () -> std::io::Result<()> {
 pub const AUDIO_SAMPLE_COUNT: usize = 1024;
 
 struct AudioCallbackData {
-    last: [F32; AUDIO_SAMPLE_COUNT],
-    recv: rtp::RtpReciever<[F32; AUDIO_SAMPLE_COUNT]>,
+    last: [f32; AUDIO_SAMPLE_COUNT],
+    recv: rtp::RtpReciever<[f32; AUDIO_SAMPLE_COUNT]>,
 }
 
 impl AudioCallback for AudioCallbackData {
@@ -79,21 +83,23 @@ impl AudioCallback for AudioCallbackData {
 
 pub fn play_audio(audio_subsystem: sdl2::AudioSubsystem) {
     let sock = std::net::UdpSocket::bind("127.0.0.1:44002").unwrap();
-    let recv: rtp::RtpReciever<[F32; AUDIO_SAMPLE_COUNT]> = rtp::RtpReciever::new(sock);
+    let recv: rtp::RtpReciever<[f32; AUDIO_SAMPLE_COUNT]> = rtp::RtpReciever::new(sock);
 
     let desired_spec = AudioSpecDesired {
         freq: Some(44100),
-        channels: Some(1),  // mono
-        samples: Some(AUDIO_SAMPLE_COUNT as u16)       // default sample size
+        channels: Some(1),                        // mono
+        samples: Some(AUDIO_SAMPLE_COUNT as u16), // default sample size
     };
 
-    let device = audio_subsystem.open_playback(None, &desired_spec, |_spec| {
-        // initialize the audio callback
-        AudioCallbackData {
-            last: [F32::from(0.0); AUDIO_SAMPLE_COUNT],
-            recv,
-        }
-    }).unwrap();
+    let device = audio_subsystem
+        .open_playback(None, &desired_spec, |_spec| {
+            // initialize the audio callback
+            AudioCallbackData {
+                last: [f32::from(0.0); AUDIO_SAMPLE_COUNT],
+                recv,
+            }
+        })
+        .unwrap();
 
     // let packets queue up
     std::thread::sleep(Duration::from_secs(1));
@@ -106,7 +112,7 @@ pub fn play_audio(audio_subsystem: sdl2::AudioSubsystem) {
 struct SquareWave {
     phase_inc: f32,
     phase: f32,
-    volume: f32
+    volume: f32,
 }
 
 impl SquareWave {
@@ -114,17 +120,17 @@ impl SquareWave {
         SquareWave {
             phase_inc: 440.0 / freq as f32,
             phase: 0.0,
-            volume: 0.25
+            volume: 0.25,
         }
     }
 
-    fn step(&mut self, buf: &mut [F32; AUDIO_SAMPLE_COUNT]) {
+    fn step(&mut self, buf: &mut [f32; AUDIO_SAMPLE_COUNT]) {
         // Generate a square wave
         for x in buf.iter_mut() {
             *x = if self.phase <= 0.5 {
-                F32::from(self.volume)
+                f32::from(self.volume)
             } else {
-                F32::from(-self.volume)
+                f32::from(-self.volume)
             };
             self.phase = (self.phase + self.phase_inc) % 1.0;
         }
@@ -137,11 +143,13 @@ pub fn send_audio() {
     let mut sender = rtp::RtpSender::new(sock);
 
     let mut square_wave = SquareWave::new(44100.0);
-    let mut bytes = [F32::from(0.0); AUDIO_SAMPLE_COUNT];
+    let mut bytes = [f32::from(0.0); AUDIO_SAMPLE_COUNT];
 
     loop {
         square_wave.step(&mut bytes);
         sender.send(bytes);
-        std::thread::sleep(Duration::from_millis(((1000 * AUDIO_SAMPLE_COUNT) / 44100) as _));
+        std::thread::sleep(Duration::from_millis(
+            ((1000 * AUDIO_SAMPLE_COUNT) / 44100) as _,
+        ));
     }
 }

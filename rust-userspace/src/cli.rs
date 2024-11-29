@@ -1,4 +1,9 @@
-use std::{collections::VecDeque, io, sync::mpsc::SyncSender, time::{Duration, Instant}};
+use std::{
+    collections::VecDeque,
+    io,
+    sync::mpsc::SyncSender,
+    time::{Duration, Instant},
+};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -10,7 +15,6 @@ use ratatui::{
     widgets::{self, Axis, Block, Chart, Dataset, Paragraph, Widget, Wrap},
     DefaultTerminal, Frame,
 };
-
 
 #[derive(Debug, Default)]
 enum TypeResult {
@@ -73,7 +77,11 @@ impl App {
     fn update_stroke_window(&mut self) {
         let now = Instant::now();
         let window_duration = Duration::from_secs(3);
-        while self.correct_stroke_window.front().map_or(false, |t| now.duration_since(*t) > window_duration) {
+        while self
+            .correct_stroke_window
+            .front()
+            .map_or(false, |t| now.duration_since(*t) > window_duration)
+        {
             self.correct_stroke_window.pop_front();
         }
     }
@@ -94,9 +102,9 @@ impl App {
             self.exit();
         }
         log::debug!("WPM: {wpm} translated to {drop_amt}");
-        
+
         self.chart_data.push_back(wpm);
-        
+
         // Keep only the last CHART_DATA_LENGTH points
         while self.chart_data.len() > CHART_DATA_LENGTH {
             self.chart_data.pop_front();
@@ -155,10 +163,7 @@ impl App {
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from(" AffirmType2000 ".bold());
-        let instructions = Line::from(vec![
-            " Quit ".into(),
-            "<Esc> ".blue().bold(),
-        ]);
+        let instructions = Line::from(vec![" Quit ".into(), "<Esc> ".blue().bold()]);
         let block = Block::bordered()
             .title(title.centered())
             .title_bottom(instructions.centered())
@@ -178,8 +183,14 @@ impl Widget for &App {
         let available_width = chart_area.width.saturating_sub(4) as usize;
         let start_idx = self.chart_data.len().saturating_sub(available_width);
 
-        let data = self.chart_data.iter().skip(start_idx)
-                        .copied().enumerate().map(|(i, y)| (i as f64, y)).collect::<Vec<_>>();
+        let data = self
+            .chart_data
+            .iter()
+            .skip(start_idx)
+            .copied()
+            .enumerate()
+            .map(|(i, y)| (i as f64, y))
+            .collect::<Vec<_>>();
 
         // Create the line chart
         let dataset = Dataset::default()
@@ -190,30 +201,40 @@ impl Widget for &App {
             .data(&data);
 
         let chart = Chart::new(vec![dataset])
-            .block(Block::bordered().title(format!(" WPM: {} ", current_wpm)).border_set(border::ROUNDED))
+            .block(
+                Block::bordered()
+                    .title(format!(" WPM: {} ", current_wpm))
+                    .border_set(border::ROUNDED),
+            )
             .x_axis(
                 Axis::default()
                     .style(Style::default().fg(Color::Gray))
-                    .bounds([1.0, available_width as f64])
+                    .bounds([1.0, available_width as f64]),
             )
             .y_axis(
                 Axis::default()
                     .style(Style::default().fg(Color::Gray))
-                    .bounds([0.0, 150.0])
+                    .bounds([0.0, 150.0]),
             );
 
-        let counter_text = Text::from(vec![Line::from(self.test_string.iter().enumerate().map(|(i, (c, tr))| {
-            let ch = match tr {
-                TypeResult::NotTypedYet => c.to_string().dim(),
-                TypeResult::Correct => c.to_string().green(),
-                TypeResult::Incorrect => c.to_string().red()
-            };
-            if i == self.cursor_position {
-                ch.underlined()
-            } else {
-                ch
-            }
-        }).collect::<Vec<_>>())]);
+        let counter_text = Text::from(vec![Line::from(
+            self.test_string
+                .iter()
+                .enumerate()
+                .map(|(i, (c, tr))| {
+                    let ch = match tr {
+                        TypeResult::NotTypedYet => c.to_string().dim(),
+                        TypeResult::Correct => c.to_string().green(),
+                        TypeResult::Incorrect => c.to_string().red(),
+                    };
+                    if i == self.cursor_position {
+                        ch.underlined()
+                    } else {
+                        ch
+                    }
+                })
+                .collect::<Vec<_>>(),
+        )]);
 
         let par_block_title = Line::from(" Text ".bold());
         let par_block = Block::bordered()

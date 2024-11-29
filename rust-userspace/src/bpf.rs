@@ -1,4 +1,7 @@
-use std::{ffi::CStr, os::raw::{c_int, c_void}};
+use std::{
+    ffi::CStr,
+    os::raw::{c_int, c_void},
+};
 
 use libbpf_sys::{bpf_obj_get, BPF_ANY};
 

@@ -1,8 +1,8 @@
 use std::{
     fmt::Debug,
     net::UdpSocket,
+    ops::{Deref, DerefMut},
     sync::{Arc, Mutex, MutexGuard},
-    time::Duration,
 };
 
 use bytes::{BufMut, BytesMut};
@@ -18,8 +18,40 @@ pub struct Packet<T: TryFromBytes + IntoBytes + KnownLayout + Immutable> {
     pub data: T,
 }
 
-const fn size_of_packet<T: TryFromBytes + IntoBytes + KnownLayout + Immutable>() -> usize {
+pub const fn size_of_packet<T: TryFromBytes + IntoBytes + KnownLayout + Immutable>() -> usize {
     std::mem::size_of::<Packet<T>>()
+}
+
+/// A buffer of bytes that is the size of a packet.
+/// Ensures that the buffer is correctly aligned for the packet type.
+#[derive(Debug)]
+struct PacketBytes<T: TryFromBytes + IntoBytes + KnownLayout + Immutable>
+where
+    [(); size_of_packet::<T>()]: Sized,
+{
+    _align: [Packet<T>; 0], // align to the alignment of the packet
+    // TODO: statically assert that the alignment is correct
+    inner: [u8; size_of_packet::<T>()],
+}
+
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable> Deref for PacketBytes<T>
+where
+    [(); size_of_packet::<T>()]: Sized,
+{
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable> DerefMut for PacketBytes<T>
+where
+    [(); size_of_packet::<T>()]: Sized,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
 }
 
 /// A packet buffer slot. See [`RtpCircularBuffer`].
@@ -28,13 +60,12 @@ where
     [(); size_of_packet::<T>()]: Sized,
 {
     init: bool,
-    packet: [u8; size_of_packet::<T>()],
+    // align to the alignment of the packet
+    packet: PacketBytes<T>,
 }
 
-#[repr(C)]
 /// A circular buffer of RTP packets.
 /// Index into this buffer with a sequence number to get a packet.
-
 pub struct RtpCircularBuffer<T: TryFromBytes + IntoBytes + KnownLayout + Immutable>
 where
     [(); size_of_packet::<T>()]: Sized,
@@ -43,6 +74,8 @@ where
     buf: Box<[MaybeInitPacket<T>; 1024]>,
 }
 
+/// A packet that has been received and is ready to be consumed.
+/// Holds a reference to the buffer it came from. When dropped, the packet is consumed and deleted.
 pub struct RecievedPacket<'a, T: TryFromBytes + IntoBytes + KnownLayout + Immutable>(
     &'a mut RtpCircularBuffer<T>,
 )
@@ -90,7 +123,10 @@ where
     const fn generate_default_packet() -> MaybeInitPacket<T> {
         MaybeInitPacket {
             init: false,
-            packet: [0u8; size_of_packet::<T>()],
+            packet: PacketBytes {
+                _align: [],
+                inner: [0u8; size_of_packet::<T>()],
+            },
         }
     }
 
