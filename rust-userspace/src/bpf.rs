@@ -19,7 +19,7 @@ pub enum BpfError {
 }
 
 pub unsafe fn init() -> Result<BpfHandle, BpfError> {
-    let res = bpf_obj_get(BPF_MAP_NAME.as_ptr() as *const i8);
+    let res = bpf_obj_get(BPF_MAP_NAME.as_ptr());
     if res < 0 {
         log::error!("Failed to load BPF map {BPF_MAP_NAME:?}: {}", res);
         return Err(BpfError::LoadMap(res));

@@ -5,7 +5,7 @@ mod cli;
 mod rtp;
 
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
-use sdl2::{self, pixels::PixelFormatEnum};
+use sdl2::{self};
 use std::time::Duration;
 
 use simplelog::WriteLogger;
@@ -96,7 +96,7 @@ pub fn play_audio(audio_subsystem: sdl2::AudioSubsystem) {
         .open_playback(None, &desired_spec, |_spec| {
             // initialize the audio callback
             AudioCallbackData {
-                last: [f32::from(0.0); AUDIO_SAMPLE_COUNT],
+                last: [0.0; AUDIO_SAMPLE_COUNT],
                 recv,
             }
         })
@@ -119,7 +119,7 @@ struct SquareWave {
 impl SquareWave {
     fn new(freq: f32) -> Self {
         SquareWave {
-            phase_inc: 440.0 / freq as f32,
+            phase_inc: 440.0 / freq,
             phase: 0.0,
             volume: 0.25,
         }
@@ -129,9 +129,9 @@ impl SquareWave {
         // Generate a square wave
         for x in buf.iter_mut() {
             *x = if self.phase <= 0.5 {
-                f32::from(self.volume)
+                self.volume
             } else {
-                f32::from(-self.volume)
+                -self.volume
             };
             self.phase = (self.phase + self.phase_inc) % 1.0;
         }
@@ -144,7 +144,7 @@ pub fn send_audio() {
     let mut sender = rtp::RtpSender::new(sock);
 
     let mut square_wave = SquareWave::new(44100.0);
-    let mut bytes = [f32::from(0.0); AUDIO_SAMPLE_COUNT];
+    let mut bytes = [0.0; AUDIO_SAMPLE_COUNT];
 
     loop {
         square_wave.step(&mut bytes);

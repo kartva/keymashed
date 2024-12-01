@@ -92,7 +92,6 @@ impl App {
 
     /// Update the chart with the new WPM value
     /// Also pushes the new WPM value to the BPF map
-
     pub fn update_chart_with_new_wpm(&mut self) {
         self.update_stroke_window();
         let wpm = self.calculate_wpm();

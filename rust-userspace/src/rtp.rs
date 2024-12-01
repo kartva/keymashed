@@ -169,7 +169,6 @@ pub struct RtpSender {
 impl RtpSender {
     /// Create a new RTP sender.
     /// The sender will bind to the given socket and set it to non-blocking mode.
-
     pub fn new(sock: UdpSocket) -> Self {
         sock.set_nonblocking(true).unwrap();
         RtpSender {
@@ -180,7 +179,6 @@ impl RtpSender {
     }
 
     /// Send a packet over the network.
-
     pub fn send<T: IntoBytes + Immutable + ?Sized, A: AsRef<T>>(&mut self, data: A) {
         // Note that the size of the packets we use is less than 10kb, for which
         // https://www.kernel.org/doc/html/v6.3/networking/msg_zerocopy.html
@@ -209,7 +207,6 @@ where
     [(); size_of_packet::<T>()]: Sized,
 {
     /// Launches listener thread that recieves packets and stores them in a buffer.
-
     pub fn new(sock: UdpSocket) -> Self {
         let rtp_circular_buffer = Arc::new(Mutex::new(RtpCircularBuffer::new()));
 
