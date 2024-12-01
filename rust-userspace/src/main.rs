@@ -70,9 +70,7 @@ impl AudioCallback for AudioCallbackData {
         if let Some(packet) = recieved_packet.get_data() {
             log::info!("Playing packet with seq: {}", packet.sequence_number);
 
-            for (i, sample) in packet.data.iter().enumerate() {
-                out[i] = f32::from(*sample);
-            }
+            out.copy_from_slice(&packet.data);
 
             self.last = packet.data;
         } else {
@@ -87,8 +85,11 @@ pub fn play_audio(audio_subsystem: sdl2::AudioSubsystem) {
 
     let desired_spec = AudioSpecDesired {
         freq: Some(44100),
-        channels: Some(1),                        // mono
-        samples: Some(AUDIO_SAMPLE_COUNT as u16), // default sample size
+        // mono
+        channels: Some(1),
+        // number of samples
+        // should be the same as the number of samples in a packet
+        samples: Some(AUDIO_SAMPLE_COUNT as u16),
     };
 
     let device = audio_subsystem
