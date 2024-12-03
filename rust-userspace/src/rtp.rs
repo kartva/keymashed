@@ -160,13 +160,15 @@ where
     }
 }
 
-pub struct RtpSender {
+/// An RTP sender. Sends packets of type `T` over the network.
+pub struct RtpSender<T: IntoBytes + Immutable + ?Sized> {
     sock: UdpSocket,
     seq_num: u32,
     scratch: BytesMut,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl RtpSender {
+impl<T: IntoBytes + Immutable + ?Sized> RtpSender<T> {
     /// Create a new RTP sender.
     /// The sender will bind to the given socket and set it to non-blocking mode.
     pub fn new(sock: UdpSocket) -> Self {
@@ -175,11 +177,12 @@ impl RtpSender {
             sock,
             seq_num: 0,
             scratch: BytesMut::with_capacity(2048),
+            _phantom: std::marker::PhantomData,
         }
     }
 
     /// Send a packet over the network.
-    pub fn send<T: IntoBytes + Immutable + ?Sized, A: AsRef<T>>(&mut self, data: A) {
+    pub fn send<A: AsRef<T>>(&mut self, data: A) {
         // Note that the size of the packets we use is less than 10kb, for which
         // https://www.kernel.org/doc/html/v6.3/networking/msg_zerocopy.html
         // copying is actually faster than MSG_ZEROCOPY.
@@ -250,9 +253,9 @@ fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug>(
             *init = true;
 
             if packet.len() > 16 {
-                log::debug!("Received packet with raw data: {:?}...", &packet[..16]);
+                log::trace!("Received packet with raw data: {:?}...", &packet[..16]);
             } else {
-                log::debug!("Received packet with raw data: {:?}", &packet);
+                log::trace!("Received packet with raw data: {:?}", &packet);
             }
         } else {
             log::info!(
