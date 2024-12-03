@@ -66,23 +66,23 @@ where
 
 /// A circular buffer of RTP packets.
 /// Index into this buffer with a sequence number to get a packet.
-pub struct RtpCircularBuffer<T: TryFromBytes + IntoBytes + KnownLayout + Immutable>
+pub struct RtpCircularBuffer<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
     earliest_seq: u32,
-    buf: Box<[MaybeInitPacket<T>; 1024]>,
+    buf: Box<[MaybeInitPacket<T>; BufferLength]>,
 }
 
 /// A packet that has been received and is ready to be consumed.
 /// Holds a reference to the buffer it came from. When dropped, the packet is consumed and deleted.
-pub struct RecievedPacket<'a, T: TryFromBytes + IntoBytes + KnownLayout + Immutable>(
-    &'a mut RtpCircularBuffer<T>,
+pub struct RecievedPacket<'a, T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize>(
+    &'a mut RtpCircularBuffer<T, BufferLength>,
 )
 where
     [(); size_of_packet::<T>()]: Sized;
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable> RecievedPacket<'_, T>
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize> RecievedPacket<'_, T, BufferLength>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -101,7 +101,7 @@ where
     }
 }
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable> Drop for RecievedPacket<'_, T>
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize> Drop for RecievedPacket<'_, T, BufferLength>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -116,7 +116,7 @@ where
     }
 }
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable> RtpCircularBuffer<T>
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize> RtpCircularBuffer<T, BufferLength>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -133,11 +133,11 @@ where
     fn new() -> Self {
         RtpCircularBuffer {
             earliest_seq: 0,
-            buf: Box::new([const { Self::generate_default_packet() }; 1024]),
+            buf: Box::new([const { Self::generate_default_packet() }; BufferLength]),
         }
     }
 
-    pub fn consume_earliest_packet(&mut self) -> RecievedPacket<'_, T> {
+    pub fn consume_earliest_packet(&mut self) -> RecievedPacket<'_, T, BufferLength> {
         RecievedPacket(self)
     }
 
@@ -192,20 +192,20 @@ impl<T: IntoBytes + Immutable + ?Sized> RtpSender<T> {
         packet.put(data.as_ref().as_bytes());
 
         self.sock.send(packet).unwrap();
-        log::debug!("Sent packet with seq: {}", self.seq_num);
+        log::debug!("{:?}: Sent packet with seq: {}", self.sock.local_addr(), self.seq_num);
         self.seq_num = self.seq_num.wrapping_add(1);
         self.scratch.clear();
     }
 }
 
-pub struct RtpReciever<T: TryFromBytes + IntoBytes + KnownLayout + Immutable>
+pub struct RtpReciever<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
-    rtp_circular_buffer: Arc<Mutex<RtpCircularBuffer<T>>>,
+    rtp_circular_buffer: Arc<Mutex<RtpCircularBuffer<T, BufferLength>>>,
 }
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Send + 'static + Debug> RtpReciever<T>
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Send + 'static + Debug, const BufferLength: usize> RtpReciever<T, BufferLength>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -223,14 +223,14 @@ where
         }
     }
 
-    pub fn lock_reciever_for_consumption(&self) -> MutexGuard<'_, RtpCircularBuffer<T>> {
+    pub fn lock_reciever_for_consumption(&self) -> MutexGuard<'_, RtpCircularBuffer<T, BufferLength>> {
         self.rtp_circular_buffer.lock().unwrap()
     }
 }
 
-fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug>(
+fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug, const BufferLength: usize>(
     sock: UdpSocket,
-    recv: Arc<Mutex<RtpCircularBuffer<T>>>,
+    recv: Arc<Mutex<RtpCircularBuffer<T, BufferLength>>>,
 ) where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -239,29 +239,42 @@ fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug>(
 
     loop {
         // wait until socket has a packet to read
-        let mut seq_num = [0u8; 4];
-        sock.peek(&mut seq_num).unwrap();
+        let mut seq_num_buffer = [0u8; 4];
+        sock.peek(&mut seq_num_buffer).unwrap();
 
         // we have available data to read
         let mut state = recv.lock().unwrap();
 
-        let seq_num: u32 = U32::from_bytes(seq_num).into();
+        let seq_num: u32 = U32::from_bytes(seq_num_buffer).into();
 
+        // If the recieved packet has a place in the buffer, write the packet to the correct slot.
         if let Some(MaybeInitPacket { init, packet }) = state.get_mut(seq_num) {
             // Prepare a raw buffer with the known layout size of Packet<T>
+
             sock.recv(packet).unwrap();
             *init = true;
 
             if packet.len() > 16 {
-                log::trace!("Received packet with raw data: {:?}...", &packet[..16]);
+                log::trace!(
+                    "{:?}: with seq_num {seq_num} and raw data: {:?}...",
+                    sock.local_addr(),
+                    &packet[..16]
+                );
             } else {
-                log::trace!("Received packet with raw data: {:?}", &packet);
+                log::trace!(
+                    "{:?}: Received packet with seq_num {seq_num} and raw data: {:?}",
+                    sock.local_addr(),
+                    &packet
+                );
             }
         } else {
+            // Otherwise, discard the packet.
+
+            let _ = sock.recv(&mut seq_num_buffer);
             log::info!(
-                "Dropping packet with seq: {} for being too early/late; {seq_num} >= {}",
+                "{:?}: Dropping packet with seq: {} for being too early/late; accepted range is {}-{}", sock.local_addr(),
                 seq_num,
-                state.buf.len()
+                state.earliest_seq, state.earliest_seq + state.buf.len() as u32
             );
             continue;
         }

@@ -7,10 +7,11 @@ use crate::{AUDIO_DEST_ADDR, AUDIO_SEND_ADDR};
 
 pub const AUDIO_SAMPLE_COUNT: usize = 1024;
 pub const AUDIO_FREQUENCY: i32 = 44100;
+pub const AUDIO_BUFFER_LENGTH: usize = 1024;
 
 pub struct AudioCallbackData {
     last: [f32; AUDIO_SAMPLE_COUNT],
-    recv: rtp::RtpReciever<[f32; AUDIO_SAMPLE_COUNT]>,
+    recv: rtp::RtpReciever<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH>,
 }
 
 impl AudioCallback for AudioCallbackData {
@@ -37,7 +38,7 @@ impl AudioCallback for AudioCallbackData {
 
 pub fn play_audio(audio_subsystem: &sdl2::AudioSubsystem) -> AudioDevice<AudioCallbackData> {
     let sock = UdpSocket::bind(AUDIO_DEST_ADDR).unwrap();
-    let recv: rtp::RtpReciever<[f32; AUDIO_SAMPLE_COUNT]> = rtp::RtpReciever::new(sock);
+    let recv: rtp::RtpReciever<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH> = rtp::RtpReciever::new(sock);
 
     let desired_spec = AudioSpecDesired {
         freq: Some(AUDIO_FREQUENCY),
