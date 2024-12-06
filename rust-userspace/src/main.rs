@@ -91,7 +91,7 @@ fn main() -> std::io::Result<()> {
     });
 
     // let packets queue up
-    std::thread::sleep(Duration::from_secs(2));
+    std::thread::sleep(Duration::from_secs(1));
 
     let mut frame_count = 0;
     loop {
