@@ -140,7 +140,7 @@ fn main() -> std::io::Result<()> {
                     let packet_data_block = &packet.data.block;
 
                     for i in 0..PACKET_Y_DIM {
-                        for j in 0..PACKET_X_DIM {
+                        for j in (0..PACKET_X_DIM).step_by(PIXEL_WIDTH) {
                             let renderbuffer_xy_index = (y + i) * (VIDEO_WIDTH as usize) * PIXEL_WIDTH + (x + j) * PIXEL_WIDTH;
                             let packet_index = i * PACKET_X_DIM + j;
                             for k in 0..PIXEL_WIDTH {
@@ -175,7 +175,7 @@ pub fn send_video() {
     let mut sender = rtp::RtpSender::new(sock);
     log::info!("Starting to send video!");
 
-    let mut camera = rscam::Camera::new("/dev/video0").unwrap();
+    let mut camera = rscam::Camera::new("/dev/video1").unwrap();
     camera.start(&rscam::Config {
         interval: (1, 30),
         resolution: (VIDEO_WIDTH as _, VIDEO_HEIGHT as _),
@@ -206,9 +206,9 @@ pub fn send_video() {
                         let cambuffer_xy_index = (y + i) * VIDEO_WIDTH as usize * PIXEL_WIDTH + (x + j) * PIXEL_WIDTH;
                         let packet_index = i * PACKET_X_DIM + j;
                         for k in 0..PIXEL_WIDTH {
-                            // packet_data_block[packet_index + k] = frame[cambuffer_xy_index + k];
-                            packet_data_block[packet_index + k] = 127;
+                            packet_data_block[packet_index + k] = frame[cambuffer_xy_index + k];
                         }
+                        
                     }
                 }
 
