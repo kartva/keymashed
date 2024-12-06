@@ -71,7 +71,11 @@ pub struct RtpCircularBuffer<T: TryFromBytes + IntoBytes + KnownLayout + Immutab
 where
     [(); size_of_packet::<T>()]: Sized,
 {
+    /// The sequence number of the earliest packet in the buffer.
     earliest_seq: u32,
+    /// The span of the earliest sequence number and the latest sequence number of a recieved packet in the buffer.
+    /// This can relied on as a hint for how full the buffer is. (i.e. how ahead is the latest recieved packet?)
+    early_latest_span: u32,
     buf: Box<[MaybeInitPacket<T>; BufferLength]>,
 }
 
@@ -115,7 +119,7 @@ where
             .init = false;
         log::debug!("consumed seq {}", rtp_reciever.earliest_seq);
         rtp_reciever.earliest_seq = rtp_reciever.earliest_seq.wrapping_add(1);
-
+        rtp_reciever.early_latest_span = rtp_reciever.early_latest_span.saturating_sub(1);
     }
 }
 
@@ -136,6 +140,7 @@ where
     fn new() -> Self {
         RtpCircularBuffer {
             earliest_seq: 0,
+            early_latest_span: 0,
             buf: Box::new([const { Self::generate_default_packet() }; BufferLength]),
         }
     }
@@ -159,6 +164,14 @@ where
         } else {
             None
         }
+    }
+
+    pub fn earliest_seq(&self) -> u32 {
+        self.earliest_seq
+    }
+
+    pub fn early_latest_span(&self) -> u32 {
+        self.early_latest_span
     }
 
     /// Returns a reference to the [`MaybeInitPacket`] slot that corresponds to the given sequence number.
@@ -246,7 +259,7 @@ where
     }
 
     /// Locks the buffer for interaction.
-    pub fn lock_reciever_for_consumption(&self) -> MutexGuard<'_, RtpCircularBuffer<T, BufferLength>> {
+    pub fn lock_reciever(&self) -> MutexGuard<'_, RtpCircularBuffer<T, BufferLength>> {
         self.rtp_circular_buffer.lock().unwrap()
     }
 }
@@ -283,7 +296,8 @@ fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug, 
                     state.consume_earliest_packet();
                 }
             }
-
+            
+            state.early_latest_span = u32::max(state.early_latest_span, seq_num.wrapping_sub(state.earliest_seq));
             let MaybeInitPacket { init, packet } = state.get_mut(seq_num).expect("Circular buffer should have space for packet.");
 
             // Prepare a raw buffer with the known layout size of Packet<T>

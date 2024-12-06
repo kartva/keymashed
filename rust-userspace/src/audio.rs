@@ -18,7 +18,7 @@ impl AudioCallback for AudioCallbackData {
     type Channel = f32;
 
     fn callback(&mut self, out: &mut [f32]) {
-        let mut locked_reciever = self.recv.lock_reciever_for_consumption();
+        let mut locked_reciever = self.recv.lock_reciever();
         let recieved_packet = locked_reciever.consume_earliest_packet();
 
         if let Some(packet) = recieved_packet.get_data() {
