@@ -140,9 +140,9 @@ fn main() -> std::io::Result<()> {
                     let packet_data_block = &packet.data.block;
 
                     for i in 0..PACKET_Y_DIM {
-                        for j in (0..PACKET_X_DIM).step_by(PIXEL_WIDTH) {
-                            let renderbuffer_xy_index = (y + i) * (VIDEO_WIDTH as usize) * PIXEL_WIDTH + (x + j) * PIXEL_WIDTH;
-                            let packet_index = i * PACKET_X_DIM + j;
+                        for j in 0..PACKET_X_DIM {
+                            let renderbuffer_xy_index = ((y + i) * (VIDEO_WIDTH as usize) * PIXEL_WIDTH) + (x + j) * PIXEL_WIDTH;
+                            let packet_index = i * PACKET_X_DIM * PIXEL_WIDTH + j * PIXEL_WIDTH;
                             for k in 0..PIXEL_WIDTH {
                                 buffer[renderbuffer_xy_index + k] = packet_data_block[packet_index + k];
                             }
@@ -202,13 +202,12 @@ pub fn send_video() {
                 let mut packet_data_block = [0u8; PACKET_SIZE];
 
                 for i in 0..PACKET_Y_DIM {
-                    for j in (0..PACKET_X_DIM).step_by(PIXEL_WIDTH) {
-                        let cambuffer_xy_index = (y + i) * VIDEO_WIDTH as usize * PIXEL_WIDTH + (x + j) * PIXEL_WIDTH;
-                        let packet_index = i * PACKET_X_DIM + j;
+                    for j in 0..PACKET_X_DIM {
+                        let cambuffer_xy_index = ((y + i) * VIDEO_WIDTH as usize * PIXEL_WIDTH) + (x + j) * PIXEL_WIDTH;
+                        let packet_index = i * PACKET_X_DIM * PIXEL_WIDTH + j * PIXEL_WIDTH;
                         for k in 0..PIXEL_WIDTH {
                             packet_data_block[packet_index + k] = frame[cambuffer_xy_index + k];
                         }
-                        
                     }
                 }
 
