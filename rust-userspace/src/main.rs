@@ -12,11 +12,9 @@ use std::{net::UdpSocket, time::Duration};
 
 use simplelog::WriteLogger;
 
-const VIDEO_WIDTH: u32 = 600;
-const VIDEO_HEIGHT: u32 = 400;
-const VIDEO_FPS_TARGET: f64 = 24.0;
-
-const ROW_WIDTH: usize = (VIDEO_WIDTH as usize) * 3;
+const VIDEO_WIDTH: u32 = 640;
+const VIDEO_HEIGHT: u32 = 480;
+const VIDEO_FPS_TARGET: f64 = 30.0;
 
 const AUDIO_SEND_ADDR: &str = "127.0.0.1:44443";
 const AUDIO_DEST_ADDR: &str = "127.0.0.1:44406";
@@ -26,8 +24,16 @@ const VIDEO_DEST_ADDR: &str = "127.0.0.1:44002";
 #[derive(FromBytes, Debug, IntoBytes, Immutable, KnownLayout)]
 struct VideoPacket {
     frame_num: u32,
-    frame_data: [u8; 1800]
+    x: u32,
+    y: u32,
+    block: [u8; 1280]
 }
+
+// Keep this in sync with frame_data size. Putting this directly in the above struct causes a compiler cyclic error due to IntoBytes.
+const PIXEL_WIDTH: usize = 2;
+const PACKET_X_DIM: usize = 32;
+const PACKET_Y_DIM: usize = 20;
+const PACKET_SIZE: usize = PACKET_X_DIM * PACKET_Y_DIM * PIXEL_WIDTH;
 
 fn main() -> std::io::Result<()> {
     let log_file = std::io::BufWriter::with_capacity(
@@ -58,7 +64,6 @@ fn main() -> std::io::Result<()> {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let audio_subsystem = sdl_context.audio().unwrap();
-    let timer_subsystem = sdl_context.timer().unwrap();
 
     std::thread::spawn(move || {
         // audio::send_audio();
@@ -76,7 +81,7 @@ fn main() -> std::io::Result<()> {
     let mut renderer = window.into_canvas().accelerated().build().unwrap();
 
     let texture_creator = renderer.texture_creator();
-    let mut texture = texture_creator.create_texture_streaming(PixelFormatEnum::RGB24, VIDEO_WIDTH, VIDEO_HEIGHT).unwrap();
+    let mut texture = texture_creator.create_texture_streaming(PixelFormatEnum::YUY2, VIDEO_WIDTH, VIDEO_HEIGHT).unwrap();
 
     let video_recieving_socket = UdpSocket::bind(VIDEO_DEST_ADDR).unwrap();
     let video_reciever = rtp::RtpReciever::<VideoPacket, 8192>::new(video_recieving_socket);
@@ -101,9 +106,9 @@ fn main() -> std::io::Result<()> {
         }
 
         texture.with_lock(None, |buffer: &mut [u8], _pitch: usize| {
-            log::info!("Playing frame {} (seq {} - {})", frame_count , frame_count * VIDEO_HEIGHT as u32, (frame_count + 1) * VIDEO_HEIGHT as u32);
+            log::info!("Playing frame {}", frame_count);
             
-            let mut row_index = 0usize;
+            let mut packet_index = 0usize;
             let mut locked_video_reciever = video_reciever.lock_reciever();
 
             // If the circular buffer hasn't seen enough future packets, wait for more to arrive
@@ -114,8 +119,7 @@ fn main() -> std::io::Result<()> {
                 locked_video_reciever = video_reciever.lock_reciever();
             }
 
-            while (row_index as u32) < VIDEO_HEIGHT {
-                let chunk = &mut buffer[row_index * ROW_WIDTH..(row_index + 1) * ROW_WIDTH];
+            while (packet_index as u32) < (VIDEO_HEIGHT * VIDEO_WIDTH * PIXEL_WIDTH as u32 / PACKET_SIZE as u32) {
                 // if we have a packet with a higher frame number, earlier packets have been dropped from the circular buffer
                 // so redraw the current frame with more up-to-date packets (and skip ahead to a later frame)
                 // Handles the case: receiver is falling behind in consuming packets.
@@ -124,17 +128,30 @@ fn main() -> std::io::Result<()> {
                     if p.data.frame_num > frame_count {
                         log::info!("Skipping ahead to frame {}", p.data.frame_num);
                         frame_count = p.data.frame_num;
-                        row_index = 0;
+                        packet_index = 0;
                     }
                 }
 
                 let packet = locked_video_reciever.consume_earliest_packet();
                 if let Some(packet) = packet.get_data() {
-                    chunk.copy_from_slice(packet.data.frame_data.as_ref());
+                    // copy the packet data into the buffer
+                    let x = packet.data.x as usize;
+                    let y = packet.data.y as usize;
+                    let packet_data_block = &packet.data.block;
+
+                    for i in 0..PACKET_Y_DIM {
+                        for j in 0..PACKET_X_DIM {
+                            let renderbuffer_xy_index = (y + i) * (VIDEO_WIDTH as usize) * PIXEL_WIDTH + (x + j) * PIXEL_WIDTH;
+                            let packet_index = i * PACKET_X_DIM + j;
+                            for k in 0..PIXEL_WIDTH {
+                                buffer[renderbuffer_xy_index + k] = packet_data_block[packet_index + k];
+                            }
+                        }
+                    }
                 } else {
-                    chunk.iter_mut().for_each(|x| *x = 0); // blacks out the row; useful for visually observing packet loss
+                    // chunk.iter_mut().for_each(|x| *x = 0); // blacks out the row; useful for visually observing packet loss
                 }
-                row_index += 1;
+                packet_index += 1;
             }
             frame_count += 1;
         }).unwrap();
@@ -158,31 +175,54 @@ pub fn send_video() {
     let mut sender = rtp::RtpSender::new(sock);
     log::info!("Starting to send video!");
 
-    let mut frame = Box::new([0u8; (VIDEO_WIDTH as usize) * (VIDEO_HEIGHT as usize) * 3]);
-    assert!(frame.len() % VIDEO_WIDTH as usize == 0);
+    let mut camera = rscam::Camera::new("/dev/video0").unwrap();
+    camera.start(&rscam::Config {
+        interval: (1, 30),
+        resolution: (VIDEO_WIDTH as _, VIDEO_HEIGHT as _),
+        format: b"YUYV",
+        ..Default::default()
+    }).unwrap();
+
+    // let frame = YUVFrame::new(VIDEO_WIDTH, VIDEO_HEIGHT, frame);
 
     let mut frame_counter = 0;
     loop {
+        let frame = camera.capture().unwrap();
+        let frame: &[u8] = frame.as_ref();
+        assert!(frame.len() % (VIDEO_WIDTH * PIXEL_WIDTH as u32) as usize == 0);
+        assert!(frame.len() / (VIDEO_WIDTH as usize * PIXEL_WIDTH) == VIDEO_HEIGHT as usize);
+
         let start_time = std::time::Instant::now();
 
-        for y in 0..VIDEO_HEIGHT {
-            for x in 0..VIDEO_WIDTH {
-                let offset = (y as usize) * (VIDEO_WIDTH as usize) * 3 + (x as usize) * 3;
-                frame[offset] = ((x + frame_counter) % 256) as u8; // Red channel
-                frame[offset + 1] = ((y + frame_counter * 2) % 256) as u8; // Green channel
-                frame[offset + 2] = ((x + y + frame_counter * 3) % 256) as u8; // Blue channel
+        for y in (0..VIDEO_HEIGHT).step_by(PACKET_Y_DIM) {
+            for x in (0..VIDEO_WIDTH).step_by(PACKET_X_DIM) {
+                let y = y as usize;
+                let x = x as usize;
+
+                let mut packet_data_block = [0u8; PACKET_SIZE];
+
+                for i in 0..PACKET_Y_DIM {
+                    for j in (0..PACKET_X_DIM).step_by(PIXEL_WIDTH) {
+                        let cambuffer_xy_index = (y + i) * VIDEO_WIDTH as usize * PIXEL_WIDTH + (x + j) * PIXEL_WIDTH;
+                        let packet_index = i * PACKET_X_DIM + j;
+                        for k in 0..PIXEL_WIDTH {
+                            // packet_data_block[packet_index + k] = frame[cambuffer_xy_index + k];
+                            packet_data_block[packet_index + k] = 127;
+                        }
+                    }
+                }
+
+                let packet = VideoPacket {
+                    frame_num: frame_counter,
+                    x: x as u32,
+                    y: y as u32,
+                    block: packet_data_block.try_into().unwrap(),
+                };
+                sender.send(packet.as_bytes());
             }
         }
 
-        for chunk in frame.chunks_exact(VIDEO_WIDTH as usize * 3) { // send one-third row at a time
-            let chunk = VideoPacket {
-                frame_num: frame_counter as u32,
-                frame_data: chunk.try_into().unwrap()
-            };
-            sender.send(chunk.as_bytes());
-        }
-
-        log::info!("Sent frame {} (seq {} - {})", frame_counter, frame_counter * VIDEO_HEIGHT as u32, (frame_counter + 1) * VIDEO_HEIGHT as u32);
+        log::info!("Sent frame {}", frame_counter);
 
         let elapsed = start_time.elapsed();
         // delay to hit target FPS

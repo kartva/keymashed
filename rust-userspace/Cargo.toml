@@ -12,6 +12,7 @@ libc = "0.2.162"
 log = "0.4.22"
 rand = "0.8.5"
 ratatui = "0.29.0"
+rscam = "0.5.5"
 sdl2 = { version = "0.37.0", features = ["image"] }
 simplelog = "0.12.2"
 zerocopy = { version = "0.8.11", features = ["derive"] }
