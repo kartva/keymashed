@@ -14,6 +14,7 @@ use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 /// Represents a packet of data that is sent over the network.
 /// T is the type of data that is being sent. It must implement [`TryFromBytes`], [`IntoBytes`], [`KnownLayout`], and [`Immutable`] for efficient zero-copy ser/de.
 pub struct Packet<T: TryFromBytes + IntoBytes + KnownLayout + Immutable> {
+    /// [`accept_thread`] relies on the presence and type of the sequence number field.
     pub sequence_number: U32,
     pub data: T,
 }
@@ -112,7 +113,9 @@ where
             .get_mut(rtp_reciever.earliest_seq)
             .unwrap()
             .init = false;
+        log::debug!("consumed seq {}", rtp_reciever.earliest_seq);
         rtp_reciever.earliest_seq = rtp_reciever.earliest_seq.wrapping_add(1);
+
     }
 }
 
@@ -137,10 +140,29 @@ where
         }
     }
 
+    /// Returns the slot with the earlist seq_num in the circular buffer.
+    /// Note that this slot may or may not contain a packet.
+    /// The slot will be consumed upon dropping the returned value.
     pub fn consume_earliest_packet(&mut self) -> RecievedPacket<'_, T, BufferLength> {
         RecievedPacket(self)
     }
 
+    /// Returns a reference to the slotwith the earlist seq_num in the buffer.
+    /// Returns None if the slot is not inhabited by a packet.
+    pub fn peek_earliest_packet(&self) -> Option<&Packet<T>> {
+        if let Some(MaybeInitPacket {
+            init: true,
+            packet: p,
+        }) = self.get(self.earliest_seq)
+        {
+            Some(Packet::<T>::try_ref_from_bytes(p).unwrap())
+        } else {
+            None
+        }
+    }
+
+    /// Returns a reference to the [`MaybeInitPacket`] slot that corresponds to the given sequence number.
+    /// Returns None if the corresponding packet is not present in the buffer.
     fn get(&self, seq_num: u32) -> Option<&MaybeInitPacket<T>> {
         if seq_num.wrapping_sub(self.earliest_seq) as usize >= self.buf.len() {
             None
@@ -172,7 +194,7 @@ impl<T: IntoBytes + Immutable + ?Sized> RtpSender<T> {
     /// Create a new RTP sender.
     /// The sender will bind to the given socket and set it to non-blocking mode.
     pub fn new(sock: UdpSocket) -> Self {
-        sock.set_nonblocking(true).unwrap();
+        sock.set_nonblocking(false).unwrap();
         RtpSender {
             sock,
             seq_num: 0,
@@ -223,6 +245,7 @@ where
         }
     }
 
+    /// Locks the buffer for interaction.
     pub fn lock_reciever_for_consumption(&self) -> MutexGuard<'_, RtpCircularBuffer<T, BufferLength>> {
         self.rtp_circular_buffer.lock().unwrap()
     }
@@ -248,7 +271,21 @@ fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug, 
         let seq_num: u32 = U32::from_bytes(seq_num_buffer).into();
 
         // If the recieved packet has a place in the buffer, write the packet to the correct slot.
-        if let Some(MaybeInitPacket { init, packet }) = state.get_mut(seq_num) {
+        // The recieved packet is allowed a place if its sequence number is larger than the earliest packet
+        // by u32::MAX / 2. (If more, this is probably a late packet and we discard it.)
+
+        if (seq_num.wrapping_sub(state.earliest_seq)) < u32::MAX / 2 {
+            // If this packet will need to overwrite old existing packets.
+            if seq_num.wrapping_sub(state.earliest_seq) as usize >= state.buf.len() {
+                log::debug!("Recieved an advanced packet with seq {}; dropping packets from {} to {}", seq_num, state.earliest_seq, seq_num.wrapping_sub(state.buf.len() as u32));
+                while seq_num.wrapping_sub(state.earliest_seq) as usize >= state.buf.len() {
+                    // Drop old packets until we can fit this new one.
+                    state.consume_earliest_packet();
+                }
+            }
+
+            let MaybeInitPacket { init, packet } = state.get_mut(seq_num).expect("Circular buffer should have space for packet.");
+
             // Prepare a raw buffer with the known layout size of Packet<T>
 
             sock.recv(packet).unwrap();
@@ -256,15 +293,11 @@ fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug, 
 
             if packet.len() > 16 {
                 log::trace!(
-                    "{:?}: with seq_num {seq_num} and raw data: {:?}...",
-                    sock.local_addr(),
-                    &packet[..16]
+                    "received seq_num {seq_num} and raw data: {:?}...", &packet[..16]
                 );
             } else {
                 log::trace!(
-                    "{:?}: Received packet with seq_num {seq_num} and raw data: {:?}",
-                    sock.local_addr(),
-                    &packet
+                    "received seq_num {seq_num} and raw data: {:?}", &packet
                 );
             }
         } else {
@@ -272,7 +305,7 @@ fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug, 
 
             let _ = sock.recv(&mut seq_num_buffer);
             log::info!(
-                "{:?}: Dropping packet with seq: {} for being too early/late; accepted range is {}-{}", sock.local_addr(),
+                "dropping seq_num {} for being too early/late; accepted range is {}-{}",
                 seq_num,
                 state.earliest_seq, state.earliest_seq + state.buf.len() as u32
             );
