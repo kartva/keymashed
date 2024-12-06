@@ -12,8 +12,8 @@ use std::{net::UdpSocket, time::Duration};
 
 use simplelog::WriteLogger;
 
-const VIDEO_WIDTH: u32 = 300;
-const VIDEO_HEIGHT: u32 = 150;
+const VIDEO_WIDTH: u32 = 600;
+const VIDEO_HEIGHT: u32 = 400;
 const VIDEO_FPS_TARGET: f64 = 24.0;
 
 const ROW_WIDTH: usize = (VIDEO_WIDTH as usize) * 3;
@@ -26,11 +26,14 @@ const VIDEO_DEST_ADDR: &str = "127.0.0.1:44002";
 #[derive(FromBytes, Debug, IntoBytes, Immutable, KnownLayout)]
 struct VideoPacket {
     frame_num: u32,
-    frame_data: [u8; 900]
+    frame_data: [u8; 1800]
 }
 
 fn main() -> std::io::Result<()> {
-    let log_file = std::fs::File::create("rust-userspace.log")?;
+    let log_file = std::io::BufWriter::with_capacity(
+        65536 /* 64 KiB */,
+        std::fs::File::create("rust-userspace.log")?
+    );
 
     WriteLogger::init(
         log::LevelFilter::Trace,
@@ -120,6 +123,7 @@ fn main() -> std::io::Result<()> {
                 if let Some(p) = locked_video_reciever.peek_earliest_packet() {
                     if p.data.frame_num > frame_count {
                         log::info!("Skipping ahead to frame {}", p.data.frame_num);
+                        frame_count = p.data.frame_num;
                         row_index = 0;
                     }
                 }
@@ -154,7 +158,7 @@ pub fn send_video() {
     let mut sender = rtp::RtpSender::new(sock);
     log::info!("Starting to send video!");
 
-    let mut frame = [0u8; (VIDEO_WIDTH as usize) * (VIDEO_HEIGHT as usize) * 3];
+    let mut frame = Box::new([0u8; (VIDEO_WIDTH as usize) * (VIDEO_HEIGHT as usize) * 3]);
     assert!(frame.len() % VIDEO_WIDTH as usize == 0);
 
     let mut frame_counter = 0;
