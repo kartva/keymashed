@@ -73,21 +73,21 @@ where
 {
     /// The sequence number of the earliest packet in the buffer.
     earliest_seq: u32,
-    /// The span of the earliest sequence number and the latest sequence number of a recieved packet in the buffer.
-    /// This can relied on as a hint for how full the buffer is. (i.e. how ahead is the latest recieved packet?)
+    /// The span of the earliest sequence number and the latest sequence number of a received packet in the buffer.
+    /// This can relied on as a hint for how full the buffer is. (i.e. how ahead is the latest received packet?)
     early_latest_span: u32,
     buf: Box<[MaybeInitPacket<T>; BufferLength]>,
 }
 
 /// A packet that has been received and is ready to be consumed.
 /// Holds a reference to the buffer it came from. When dropped, the packet is consumed and deleted.
-pub struct RecievedPacket<'a, T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize>(
+pub struct ReceivedPacket<'a, T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize>(
     &'a mut RtpCircularBuffer<T, BufferLength>,
 )
 where
     [(); size_of_packet::<T>()]: Sized;
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize> RecievedPacket<'_, T, BufferLength>
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize> ReceivedPacket<'_, T, BufferLength>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -106,7 +106,7 @@ where
     }
 }
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize> Drop for RecievedPacket<'_, T, BufferLength>
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize> Drop for ReceivedPacket<'_, T, BufferLength>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -148,8 +148,8 @@ where
     /// Returns the slot with the earlist seq_num in the circular buffer.
     /// Note that this slot may or may not contain a packet.
     /// The slot will be consumed upon dropping the returned value.
-    pub fn consume_earliest_packet(&mut self) -> RecievedPacket<'_, T, BufferLength> {
-        RecievedPacket(self)
+    pub fn consume_earliest_packet(&mut self) -> ReceivedPacket<'_, T, BufferLength> {
+        ReceivedPacket(self)
     }
 
     /// Returns a reference to the slotwith the earlist seq_num in the buffer.
@@ -283,14 +283,14 @@ fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug, 
 
         let seq_num: u32 = U32::from_bytes(seq_num_buffer).into();
 
-        // If the recieved packet has a place in the buffer, write the packet to the correct slot.
-        // The recieved packet is allowed a place if its sequence number is larger than the earliest packet
+        // If the received packet has a place in the buffer, write the packet to the correct slot.
+        // The received packet is allowed a place if its sequence number is larger than the earliest packet
         // by u32::MAX / 2. (If more, this is probably a late packet and we discard it.)
 
         if (seq_num.wrapping_sub(state.earliest_seq)) < u32::MAX / 2 {
             // If this packet will need to overwrite old existing packets.
             if seq_num.wrapping_sub(state.earliest_seq) as usize >= state.buf.len() {
-                log::debug!("Recieved an advanced packet with seq {}; dropping packets from {} to {}", seq_num, state.earliest_seq, seq_num.wrapping_sub(state.buf.len() as u32));
+                log::debug!("received an advanced packet with seq {}; dropping packets from {} to {}", seq_num, state.earliest_seq, seq_num.wrapping_sub(state.buf.len() as u32));
                 while seq_num.wrapping_sub(state.earliest_seq) as usize >= state.buf.len() {
                     // Drop old packets until we can fit this new one.
                     state.consume_earliest_packet();
@@ -307,7 +307,7 @@ fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug, 
 
             if packet.len() > 16 {
                 log::trace!(
-                    "received seq_num {seq_num} and raw data: {:?}...", &packet[..16]
+                    "received seq_num {seq_num} and raw data: {:?}... (len {})", &packet[..16], packet.len()
                 );
             } else {
                 log::trace!(

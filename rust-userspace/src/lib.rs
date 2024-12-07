@@ -10,6 +10,17 @@ pub const VIDEO_WIDTH: u32 = 640;
 pub const VIDEO_HEIGHT: u32 = 480;
 pub const VIDEO_FPS_TARGET: f64 = 30.0;
 
+pub const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
+pub const BUFFER_LOGS: bool = false;
+
+const _: () = {
+    if BUFFER_LOGS {
+        if let log::LevelFilter::Off = LOG_LEVEL {
+            panic!("BUFFER_LOGS is enabled but LOG_LEVEL is not Off");
+        }
+    }
+};
+
 pub const PACKET_SEND_THRESHOLD: usize = 1500;
 
 pub const AUDIO_SEND_ADDR: &str = "127.0.0.1:44406";

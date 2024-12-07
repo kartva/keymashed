@@ -31,9 +31,9 @@ impl AudioCallback for AudioCallbackData {
             locked_reciever = self.recv.lock_reciever();
         }
 
-        let recieved_packet = locked_reciever.consume_earliest_packet();
+        let received_packet = locked_reciever.consume_earliest_packet();
 
-        if let Some(packet) = recieved_packet.get_data() {
+        if let Some(packet) = received_packet.get_data() {
             log::info!("Playing packet with seq: {}", packet.sequence_number);
 
             out.copy_from_slice(&packet.data);

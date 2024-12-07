@@ -5,7 +5,7 @@ use run_louder::rtp::RtpSender;
 use sdl2::{self, pixels::PixelFormatEnum};
 use video::{decode_quantized_macroblock, dequantize_macroblock, encode_quantized_macroblock, quantize_macroblock, MacroblockWithPosition, MutableYUVFrame, YUVFrame, YUVFrameMacroblockIterator};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, TryFromBytes};
-use std::{net::UdpSocket, time::Duration};
+use std::{io::Write, net::UdpSocket, time::Duration};
 
 use simplelog::WriteLogger;
 
@@ -16,13 +16,17 @@ struct VideoPacket {
 }
 
 fn main() -> std::io::Result<()> {
-    let log_file = std::io::BufWriter::with_capacity(
-        65536 /* 64 KiB */,
-        std::fs::File::create("recv.log")?
-    );
+    let log_file: Box<dyn Write + Send> = if BUFFER_LOGS {
+        Box::new(std::io::BufWriter::with_capacity(
+            65536 /* 64 KiB */,
+            std::fs::File::create("recv.log")?
+        ))
+    } else {
+        Box::new(std::fs::File::create("recv.log")?)
+    };
 
     WriteLogger::init(
-        log::LevelFilter::Trace,
+        LOG_LEVEL,
         simplelog::Config::default(),
         log_file,
     )
@@ -114,12 +118,19 @@ fn main() -> std::io::Result<()> {
 
                     let cursor_start_len = cursor.len();
                     let _packet_frame_count = cursor.get_u32();
-                    while cursor.has_remaining() {
+                    loop {
+                        let cursor_position = cursor_start_len - cursor.remaining();
+                        let prev_len = cursor.len();
                         let x = cursor.get_u16() as usize;
                         let y = cursor.get_u16() as usize;
 
+                        if (x == u16::MAX as usize) && (y == u16::MAX as usize) {
+                            break;
+                        }
+
+                        log::trace!("Receiving MacroblockWithPos at ({frame_count}, {x}, {y}) at cursor position {cursor_position}");
+
                         let decoded_quantized_macroblock;
-                        log::trace!("Receiving macroblock at ({}, {}, {}) at cursor position {}", frame_count, x, y, cursor_start_len - cursor.remaining());
                         (decoded_quantized_macroblock, cursor) = decode_quantized_macroblock(&cursor);
                         let macroblock = dequantize_macroblock(&decoded_quantized_macroblock);
                         macroblock.copy_to_yuv422_frame(MutableYUVFrame::new(VIDEO_WIDTH as usize, VIDEO_HEIGHT as usize, buffer), x, y);

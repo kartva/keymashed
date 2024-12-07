@@ -419,6 +419,7 @@ use crate::{VIDEO_HEIGHT, VIDEO_WIDTH};
 /// Currently performs RLE encoding.
 fn encode_quantized_block(block: &[[i8; 8]; 8], buf: &mut Vec<u8>) {
     let zig_zag_block = QuantizedZigZagBlock::new_ref(block);
+    let buf_start = buf.len();
 
     let mut zig_zag_out = Vec::new();
     for i in 0..64 {
@@ -446,7 +447,7 @@ fn encode_quantized_block(block: &[[i8; 8]; 8], buf: &mut Vec<u8>) {
     }
 
     let mut s = String::new();
-    for chunk in buf.chunks(2) {
+    for chunk in buf[buf_start..].chunks(2) {
         s.push_str(&format!("{:02x}x{} ", chunk[0], chunk[1]));
     }
     log::trace!("{zig_zag_out:?} -> {}", s);
@@ -467,6 +468,7 @@ pub fn encode_quantized_macroblock(quantized_macroblock: &QuantizedMacroblock, b
 
 /// Decodes a quantized block from the stream, returning the block and a pointer to the remaining data.
 fn decode_quantized_block(data: &[u8]) -> ([[i8; 8]; 8], &[u8]) {
+    log::trace!("Decode quantized block: given data slice of length {}", data.len());
     let mut block = [[0; 8]; 8];
     let quantized_block = QuantizedZigZagBlock::new_ref_mut(&mut block);
 

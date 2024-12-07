@@ -4,18 +4,22 @@ use bytes::{Buf, BufMut, Bytes};
 use rtp::RtpSender;
 use sdl2::{self, pixels::PixelFormatEnum};
 use video::{decode_quantized_macroblock, dequantize_macroblock, encode_quantized_macroblock, quantize_macroblock, MacroblockWithPosition, MutableYUVFrame, YUVFrame, YUVFrameMacroblockIterator};
-use std::{net::UdpSocket, time::Duration};
+use std::{io::Write, net::UdpSocket, time::Duration};
 
 use simplelog::WriteLogger;
 
 fn main() -> std::io::Result<()> {
-    let log_file = std::io::BufWriter::with_capacity(
-        65536 /* 64 KiB */,
-        std::fs::File::create("send.log")?
-    );
+    let log_file: Box<dyn Write + Send> = if BUFFER_LOGS {
+        Box::new(std::io::BufWriter::with_capacity(
+                    65536 /* 64 KiB */,
+                    std::fs::File::create("send.log")?
+                ))
+    } else {
+        Box::new(std::fs::File::create("send.log")?)
+    };
 
     WriteLogger::init(
-        log::LevelFilter::Trace,
+        LOG_LEVEL,
         simplelog::Config::default(),
         log_file,
     )
@@ -63,13 +67,16 @@ pub fn send_video() {
             mb_buf.put_u16(y as u16);
             encode_quantized_macroblock(&quantized_macroblock, &mut mb_buf);
 
-            if packet_buf.len() + mb_buf.len() >= PACKET_SEND_THRESHOLD {
+            if packet_buf.len() + mb_buf.len() + 4 >= PACKET_SEND_THRESHOLD {
                 // send the packet and start a new one
+                packet_buf.put_u16(u16::MAX);
+                packet_buf.put_u16(u16::MAX);
                 sender.send(&packet_buf);
                 packet_buf.clear();
                 packet_buf.put_u32(frame_count);
             }
 
+            // The macroblock consists of x, y, and the encoded macroblock
             log::trace!("Storing macroblock at ({}, {}, {}) at cursor position {}", frame_count, x, y, packet_buf.len());
             packet_buf.put_slice(&mb_buf);
         }
