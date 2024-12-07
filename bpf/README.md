@@ -1,4 +1,4 @@
-```
+```bash
 sudo apt install -y clang gcc-multilib
 clang -target bpf -O2 -g -o bpf.o -c bpf.c
 
@@ -26,9 +26,24 @@ sudo tc filter add dev wlp3s0 ingress bpf da obj bpf.o sec classifier
 sudo tc filter add dev wlp3s0 protocol all parent 1: prio 1 bpf da obj bpf.o sec classifier
 ```
 
+Without comments:
+
+```bash
+sudo tc qdisc add dev lo ingress
+sudo tc qdisc add dev lo root handle 1: prio
+sudo tc filter add dev lo ingress bpf da obj bpf.o sec classifier
+sudo tc filter add dev lo protocol all parent 1: prio 1 bpf da obj bpf.o sec classifier
+```
+
 To remove the filter:
 
 ```
 sudo tc qdisc del dev wlp3s0 root
 sudo tc qdisc del dev wlp3s0 ingress
+```
+
+To observe installed filters:
+```
+sudo tc filter show dev wlp3s0
+sudo tc qdisc show dev wlp3s0
 ```
