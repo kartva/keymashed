@@ -6,8 +6,11 @@ mod rtp;
 mod audio;
 mod video;
 
+use bytes::{Buf, BufMut, Bytes};
+use rtp::RtpSender;
 use sdl2::{self, pixels::PixelFormatEnum};
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use video::{decode_quantized_macroblock, dequantize_macroblock, encode_quantized_macroblock, quantize_macroblock, MacroblockWithPosition, MutableYUVFrame, YUVFrame, YUVFrameMacroblockIterator};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, TryFromBytes};
 use std::{net::UdpSocket, time::Duration};
 
 use simplelog::WriteLogger;
@@ -16,23 +19,23 @@ const VIDEO_WIDTH: u32 = 640;
 const VIDEO_HEIGHT: u32 = 480;
 const VIDEO_FPS_TARGET: f64 = 30.0;
 
+const PACKET_SEND_THRESHOLD: usize = 1500;
+
 const AUDIO_SEND_ADDR: &str = "127.0.0.1:44443";
 const AUDIO_DEST_ADDR: &str = "127.0.0.1:44406";
 const VIDEO_SEND_ADDR: &str = "127.0.0.1:44001";
 const VIDEO_DEST_ADDR: &str = "127.0.0.1:44002";
 
 #[derive(FromBytes, Debug, IntoBytes, Immutable, KnownLayout)]
+#[repr(C)]
 struct VideoPacket {
-    frame_num: u32,
-    x: u32,
-    y: u32,
-    block: [u8; 1280]
+    data: [u8; 1504]
 }
 
 // Keep this in sync with frame_data size. Putting this directly in the above struct causes a compiler cyclic error due to IntoBytes.
 const PIXEL_WIDTH: usize = 2;
-const PACKET_X_DIM: usize = 32;
-const PACKET_Y_DIM: usize = 20;
+const PACKET_X_DIM: usize = 16;
+const PACKET_Y_DIM: usize = 16;
 const PACKET_SIZE: usize = PACKET_X_DIM * PACKET_Y_DIM * PIXEL_WIDTH;
 
 fn main() -> std::io::Result<()> {
@@ -91,7 +94,7 @@ fn main() -> std::io::Result<()> {
     });
 
     // let packets queue up
-    std::thread::sleep(Duration::from_secs(1));
+    std::thread::sleep(Duration::from_secs(3));
 
     let mut frame_count = 0;
     loop {
@@ -113,7 +116,8 @@ fn main() -> std::io::Result<()> {
 
             // If the circular buffer hasn't seen enough future packets, wait for more to arrive
             // Handles the case: sender is falling behind in sending packets.
-            while locked_video_reciever.early_latest_span() < VIDEO_HEIGHT {
+            while locked_video_reciever.early_latest_span() < 5 {
+                log::debug!("Sleeping and waiting for more packets to arrive. Early-latest span {}", locked_video_reciever.early_latest_span());
                 drop(locked_video_reciever);
                 std::thread::sleep(Duration::from_secs_f64(1.0 / VIDEO_FPS_TARGET));
                 locked_video_reciever = video_reciever.lock_reciever();
@@ -123,11 +127,14 @@ fn main() -> std::io::Result<()> {
                 // if we have a packet with a higher frame number, earlier packets have been dropped from the circular buffer
                 // so redraw the current frame with more up-to-date packets (and skip ahead to a later frame)
                 // Handles the case: receiver is falling behind in consuming packets.
+                log::trace!("Playing Frame {frame_count} packet index: {}", packet_index);
                 
                 if let Some(p) = locked_video_reciever.peek_earliest_packet() {
-                    if p.data.frame_num > frame_count {
-                        log::info!("Skipping ahead to frame {}", p.data.frame_num);
-                        frame_count = p.data.frame_num;
+                    let mut cursor = &p.data.data[..];
+                    let packet_frame_count = cursor.get_u32();
+                    if packet_frame_count > frame_count {
+                        log::info!("Skipping ahead to frame {}", packet_frame_count);
+                        frame_count = packet_frame_count;
                         packet_index = 0;
                     }
                 }
@@ -135,18 +142,19 @@ fn main() -> std::io::Result<()> {
                 let packet = locked_video_reciever.consume_earliest_packet();
                 if let Some(packet) = packet.get_data() {
                     // copy the packet data into the buffer
-                    let x = packet.data.x as usize;
-                    let y = packet.data.y as usize;
-                    let packet_data_block = &packet.data.block;
+                    let mut cursor = &packet.data.data[..];
 
-                    for i in 0..PACKET_Y_DIM {
-                        for j in 0..PACKET_X_DIM {
-                            let renderbuffer_xy_index = ((y + i) * (VIDEO_WIDTH as usize) * PIXEL_WIDTH) + (x + j) * PIXEL_WIDTH;
-                            let packet_index = i * PACKET_X_DIM * PIXEL_WIDTH + j * PIXEL_WIDTH;
-                            for k in 0..PIXEL_WIDTH {
-                                buffer[renderbuffer_xy_index + k] = packet_data_block[packet_index + k];
-                            }
-                        }
+                    let cursor_start_len = cursor.len();
+                    let _packet_frame_count = cursor.get_u32();
+                    while cursor.has_remaining() {
+                        let x = cursor.get_u16() as usize;
+                        let y = cursor.get_u16() as usize;
+
+                        let decoded_quantized_macroblock;
+                        log::trace!("Receiving macroblock at ({}, {}, {}) at cursor position {}", frame_count, x, y, cursor_start_len - cursor.remaining());
+                        (decoded_quantized_macroblock, cursor) = decode_quantized_macroblock(&cursor);
+                        let macroblock = dequantize_macroblock(&decoded_quantized_macroblock);
+                        macroblock.copy_to_yuv422_frame(MutableYUVFrame::new(VIDEO_WIDTH as usize, VIDEO_HEIGHT as usize, buffer), x, y);
                     }
                 } else {
                     // chunk.iter_mut().for_each(|x| *x = 0); // blacks out the row; useful for visually observing packet loss
@@ -172,7 +180,7 @@ pub fn send_video() {
     let sock = std::net::UdpSocket::bind(VIDEO_SEND_ADDR).unwrap();
 
     sock.connect(VIDEO_DEST_ADDR).unwrap();
-    let mut sender = rtp::RtpSender::new(sock);
+    let mut sender: RtpSender<[u8]> = rtp::RtpSender::new(sock);
     log::info!("Starting to send video!");
 
     let mut camera = rscam::Camera::new("/dev/video1").unwrap();
@@ -183,9 +191,7 @@ pub fn send_video() {
         ..Default::default()
     }).unwrap();
 
-    // let frame = YUVFrame::new(VIDEO_WIDTH, VIDEO_HEIGHT, frame);
-
-    let mut frame_counter = 0;
+    let mut frame_count = 0;
     loop {
         let frame = camera.capture().unwrap();
         let frame: &[u8] = frame.as_ref();
@@ -194,40 +200,36 @@ pub fn send_video() {
 
         let start_time = std::time::Instant::now();
 
-        for y in (0..VIDEO_HEIGHT).step_by(PACKET_Y_DIM) {
-            for x in (0..VIDEO_WIDTH).step_by(PACKET_X_DIM) {
-                let y = y as usize;
-                let x = x as usize;
+        let frame = YUVFrame::new(VIDEO_WIDTH as usize, VIDEO_HEIGHT as usize, frame);
+        let mut packet_buf = Vec::new();
 
-                let mut packet_data_block = [0u8; PACKET_SIZE];
+        packet_buf.put_u32(frame_count);
+        for MacroblockWithPosition {x, y, block} in YUVFrameMacroblockIterator::new(&frame) {
+            let quantized_macroblock = quantize_macroblock(&block);
 
-                for i in 0..PACKET_Y_DIM {
-                    for j in 0..PACKET_X_DIM {
-                        let cambuffer_xy_index = ((y + i) * VIDEO_WIDTH as usize * PIXEL_WIDTH) + (x + j) * PIXEL_WIDTH;
-                        let packet_index = i * PACKET_X_DIM * PIXEL_WIDTH + j * PIXEL_WIDTH;
-                        for k in 0..PIXEL_WIDTH {
-                            packet_data_block[packet_index + k] = frame[cambuffer_xy_index + k];
-                        }
-                    }
-                }
+            let mut mb_buf = Vec::new();
+            mb_buf.put_u16(x as u16);
+            mb_buf.put_u16(y as u16);
+            encode_quantized_macroblock(&quantized_macroblock, &mut mb_buf);
 
-                let packet = VideoPacket {
-                    frame_num: frame_counter,
-                    x: x as u32,
-                    y: y as u32,
-                    block: packet_data_block.try_into().unwrap(),
-                };
-                sender.send(packet.as_bytes());
+            if packet_buf.len() + mb_buf.len() >= PACKET_SEND_THRESHOLD {
+                // send the packet and start a new one
+                sender.send(&packet_buf);
+                packet_buf.clear();
+                packet_buf.put_u32(frame_count);
             }
+
+            log::trace!("Storing macroblock at ({}, {}, {}) at cursor position {}", frame_count, x, y, packet_buf.len());
+            packet_buf.put_slice(&mb_buf);
         }
 
-        log::info!("Sent frame {}", frame_counter);
+        log::info!("Sent frame {}", frame_count);
 
         let elapsed = start_time.elapsed();
         // delay to hit target FPS
         if elapsed < Duration::from_secs_f64(1.0 / VIDEO_FPS_TARGET) {
             std::thread::sleep(Duration::from_secs_f64(1.0 / VIDEO_FPS_TARGET) - elapsed);
         }
-        frame_counter += 1;
+        frame_count += 1;
     }
 }
