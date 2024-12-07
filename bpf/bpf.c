@@ -29,15 +29,14 @@ struct {
 __section("classifier")
 int scream_bpf(struct __sk_buff *skb)
 {
-    uint32_t key = 0, *val;
+    uint32_t key = 0, *val = 0;
 
 	val = map_lookup_elem(&map_scream, &key);
-    int prob_frac = 0;
+    int prob_frac = UINT32_MAX / 7; // by default, 15% packet loss
 	if (val)
 		prob_frac = *val;
 
-    // Implement probability check here (e.g., a simple random function)
-    if (get_prandom_u32() < prob_frac) { // 10% probability
+    if (get_prandom_u32() < prob_frac) {
         return TC_ACT_SHOT; // Drop packet
     }
     return TC_ACT_OK; // Pass packet

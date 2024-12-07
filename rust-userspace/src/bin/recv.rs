@@ -7,7 +7,7 @@ use bytes::Buf;
 use sdl2::{self, pixels::{Color, PixelFormatEnum}, rect::Rect};
 use video::{decode_quantized_macroblock, dequantize_macroblock, Macroblock, MutableYUVFrame};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-use std::{io::Write, net::UdpSocket, time::Duration};
+use std::{io::Write, net::{TcpListener, TcpStream, UdpSocket}, time::Duration};
 
 use simplelog::WriteLogger;
 
@@ -34,18 +34,21 @@ fn main() -> std::io::Result<()> {
     )
     .unwrap();
 
-    // std::thread::spawn(move || {
-    //     log::info!("Starting BPF thread");
-    //     let bpf_handle = unsafe { bpf::init().unwrap() };
-    //     log::info!("BPF map found and opened");
-    //     loop {
-    //         match receiver.recv() {
-    //             Ok(val) => bpf_handle.write_to_map(0, val).unwrap(),
-    //             Err(_) => break,
-    //         }
-    //     }
-    // });
-    // cli::main(sender)
+    let (bpf_write_channel, bpf_receive_channel) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        log::info!("Starting BPF thread");
+        let bpf_handle = unsafe { bpf::init().unwrap() };
+        log::info!("BPF map found and opened");
+        loop {
+            match bpf_receive_channel.recv() {
+                Ok(val) => bpf_handle.write_to_map(0, val).unwrap(),
+                Err(_) => break,
+            }
+        }
+    });
+
+    // Remove packet loss when setting up network connections.
+    bpf_write_channel.send(0).unwrap();
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -56,7 +59,7 @@ fn main() -> std::io::Result<()> {
     let display_mode = video_subsystem.desktop_display_mode(0).unwrap();
 
     let window = video_subsystem.window("rust-userspace", display_mode.w as u32, display_mode.h as u32)
-        .position_centered().fullscreen_desktop()
+        .position_centered()//.fullscreen_desktop()
         .build().unwrap();
     // we don't use vsync here because my monitor runs at 120hz and I don't want to stream at that rate
 
@@ -72,27 +75,61 @@ fn main() -> std::io::Result<()> {
     // Create a destination rectangle for the texture at its original size
     let dest_rect = Rect::new(x as i32, y as i32, VIDEO_WIDTH, VIDEO_HEIGHT);
 
-
     let texture_creator = renderer.texture_creator();
     let mut texture = texture_creator.create_texture_streaming(PixelFormatEnum::YUY2, VIDEO_WIDTH, VIDEO_HEIGHT).unwrap();
 
     let video_recieving_socket = UdpSocket::bind(VIDEO_DEST_ADDR).unwrap();
     let video_reciever = rtp::RtpReciever::<VideoPacket, 8192>::new(video_recieving_socket);
 
-    // let packets queue up
-    std::thread::sleep(Duration::from_secs(3));
+    let sender_communication_socket = TcpListener::bind(CONTROL_RECV_ADDR).unwrap();
+    log::info!("Waiting for sender to connect to control server at {}", CONTROL_RECV_ADDR);
+    let (mut sender_communication_socket, sender_addr) = sender_communication_socket.accept().unwrap();
+    log::info!("Sender connected to control server from {sender_addr:?}");
 
     let mut frame_count = 0;
+    let mut typing_metrics = wpm::TypingMetrics::new();
     loop {
         let start_time = std::time::Instant::now();
+
+        // Handle input
 
         let mut event_pump = sdl_context.event_pump().unwrap();
         for event in event_pump.poll_iter() {
             match event {
                 sdl2::event::Event::Quit {..} => return Ok(()),
+                sdl2::event::Event::KeyDown { keycode, repeat: false, timestamp: _, .. } => {
+                    match keycode {
+                        Some(k) => {
+                            let ik = k.into_i32();
+                            typing_metrics.receive_char_stroke(ik);
+                        },
+                        _ => {}
+                    }
+                },
                 _ => {}
             }
         }
+
+        let wpm = typing_metrics.calc_wpm();
+        log::info!("WPM: {}", wpm);
+
+        let bpf_drop_rate = wpm::wpm_to_drop_amt(wpm);
+        log::info!("BPF drop rate: {} ({})", bpf_drop_rate, (bpf_drop_rate as f64 / u32::MAX as f64) * 100.0);
+
+        match bpf_write_channel.send(bpf_drop_rate) {
+            Ok(_) => {},
+            Err(_) => {
+                log::error!("Failed to send BPF drop rate to BPF thread");
+            },
+        }
+
+        // send desired quality to sender
+        let quality = wpm::wpm_to_jpeg_quality(wpm);
+        let control_msg = ControlMessage { quality };
+        sender_communication_socket.write(control_msg.as_bytes()).unwrap();
+        log::info!("Sent quality update: {}", quality);
+
+        // Draw video
 
         renderer.set_draw_color(Color::CYAN);
         renderer.clear();

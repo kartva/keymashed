@@ -335,7 +335,7 @@ fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug, 
             // Otherwise, discard the packet.
 
             let _ = sock.recv(&mut seq_num_buffer);
-            log::info!(
+            log::debug!(
                 "dropping seq_num {} for being too early/late; accepted range is {}-{}",
                 seq_num,
                 state.earliest_seq, state.earliest_seq + state.buf.len() as u32
