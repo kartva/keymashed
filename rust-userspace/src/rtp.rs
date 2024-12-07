@@ -56,13 +56,30 @@ where
 }
 
 /// A packet buffer slot. See [`RtpCircularBuffer`].
-struct MaybeInitPacket<T: TryFromBytes + IntoBytes + KnownLayout + Immutable>
+pub struct MaybeInitPacket<T: TryFromBytes + IntoBytes + KnownLayout + Immutable>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
     init: bool,
     // align to the alignment of the packet
     packet: PacketBytes<T>,
+}
+
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable> MaybeInitPacket<T>
+where
+    [(); size_of_packet::<T>()]: Sized
+{
+    pub fn is_init(&self) -> bool {
+        self.init
+    }
+
+    pub fn get_data(&self) -> Option<&Packet<T>> {
+        if self.init {
+            Some(Packet::<T>::try_ref_from_bytes(&self.packet).unwrap())
+        } else {
+            None
+        }
+    }
 }
 
 /// A circular buffer of RTP packets.
@@ -176,7 +193,7 @@ where
 
     /// Returns a reference to the [`MaybeInitPacket`] slot that corresponds to the given sequence number.
     /// Returns None if the corresponding packet is not present in the buffer.
-    fn get(&self, seq_num: u32) -> Option<&MaybeInitPacket<T>> {
+    pub fn get(&self, seq_num: u32) -> Option<&MaybeInitPacket<T>> {
         if seq_num.wrapping_sub(self.earliest_seq) as usize >= self.buf.len() {
             None
         } else {

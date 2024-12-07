@@ -3,7 +3,6 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use rscam::{Camera, Config};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unalign, Unaligned};
 
 #[derive(FromBytes, Immutable, KnownLayout, Unaligned, IntoBytes)]
@@ -143,13 +142,22 @@ pub struct MacroblockWithPosition {
 
 pub struct YUVFrameMacroblockIterator<'a> {
     frame: &'a YUVFrame<'a>,
+    x_start: usize,
+    y_start: usize,
     x: usize,
     y: usize,
+    x_end: usize,
+    y_end: usize,
 }
 
 impl<'a> YUVFrameMacroblockIterator<'a> {
     pub fn new(frame: &'a YUVFrame<'a>) -> Self {
-        Self { frame, x: 0, y: 0 }
+        Self { frame, x_start: 0, y_start: 0, x: 0, y: 0, x_end: frame.width, y_end: frame.height }
+    }
+
+    /// Iterate over a subset of the frame defined by the rectangle (x, y) to (x_end, y_end).
+    pub fn new_with_bounds(frame: &'a YUVFrame<'a>, x_start: usize, y_start: usize, x_end: usize, y_end: usize) -> Self {
+        Self { frame, x_start, y_start, x: x_start, y: y_start, x_end, y_end }
     }
 }
 
@@ -157,7 +165,7 @@ impl<'a> Iterator for YUVFrameMacroblockIterator<'a> {
     type Item = MacroblockWithPosition;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.y >= self.frame.height {
+        if self.y >= self.y_end {
             return None;
         }
 
@@ -187,12 +195,12 @@ impl<'a> Iterator for YUVFrameMacroblockIterator<'a> {
         let (x, y) = (self.x, self.y);
 
         self.x += 16;
-        if self.x >= self.frame.width {
-            self.x = 0;
+        if self.x >= self.x_end {
+            self.x = self.x_start;
             self.y += 16;
         }
 
-        Some(MacroblockWithPosition{ x, y, block })
+        Some(MacroblockWithPosition { x, y, block })
     }
 }
 

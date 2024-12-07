@@ -10,8 +10,8 @@ pub const VIDEO_WIDTH: u32 = 640;
 pub const VIDEO_HEIGHT: u32 = 480;
 pub const VIDEO_FPS_TARGET: f64 = 30.0;
 
-pub const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Trace;
-pub const BUFFER_LOGS: bool = true;
+pub const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Warn;
+pub const BUFFER_LOGS: bool = false;
 
 pub const PACKET_SEND_THRESHOLD: usize = 1500;
 

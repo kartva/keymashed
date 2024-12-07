@@ -1,10 +1,11 @@
+#![feature(generic_const_exprs)]
+
 use run_louder::*;
 
-use bytes::{Buf, BufMut, Bytes};
-use run_louder::rtp::RtpSender;
+use bytes::Buf;
 use sdl2::{self, pixels::PixelFormatEnum};
-use video::{decode_quantized_macroblock, dequantize_macroblock, encode_quantized_macroblock, quantize_macroblock, MacroblockWithPosition, MutableYUVFrame, YUVFrame, YUVFrameMacroblockIterator};
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, TryFromBytes};
+use video::{decode_quantized_macroblock, dequantize_macroblock, MutableYUVFrame};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use std::{io::Write, net::UdpSocket, time::Duration};
 
 use simplelog::WriteLogger;
@@ -90,9 +91,7 @@ fn main() -> std::io::Result<()> {
             // Handles the case: sender is falling behind in sending packets.
             while locked_video_reciever.early_latest_span() < 5 {
                 log::debug!("Sleeping and waiting for more packets to arrive. Early-latest span {}", locked_video_reciever.early_latest_span());
-                drop(locked_video_reciever);
-                std::thread::sleep(Duration::from_secs_f64(1.0 / VIDEO_FPS_TARGET));
-                locked_video_reciever = video_reciever.lock_reciever();
+                return;
             }
 
             while (packet_index as u32) < (VIDEO_HEIGHT * VIDEO_WIDTH * PIXEL_WIDTH as u32 / PACKET_SIZE as u32) {
@@ -120,7 +119,6 @@ fn main() -> std::io::Result<()> {
                     let _packet_frame_count = cursor.get_u32();
                     loop {
                         let cursor_position = cursor_start_len - cursor.remaining();
-                        let prev_len = cursor.len();
                         let x = cursor.get_u16() as usize;
                         let y = cursor.get_u16() as usize;
 
@@ -135,8 +133,6 @@ fn main() -> std::io::Result<()> {
                         let macroblock = dequantize_macroblock(&decoded_quantized_macroblock);
                         macroblock.copy_to_yuv422_frame(MutableYUVFrame::new(VIDEO_WIDTH as usize, VIDEO_HEIGHT as usize, buffer), x, y);
                     }
-                } else {
-                    // chunk.iter_mut().for_each(|x| *x = 0); // blacks out the row; useful for visually observing packet loss
                 }
                 packet_index += 1;
             }
@@ -149,8 +145,11 @@ fn main() -> std::io::Result<()> {
 
         let elapsed = start_time.elapsed();
         // delay to hit target FPS
-        if elapsed < Duration::from_secs_f64(1.0 / VIDEO_FPS_TARGET) {
-            std::thread::sleep(Duration::from_secs_f64(1.0 / VIDEO_FPS_TARGET) - elapsed);
+        let target_latency = Duration::from_secs_f64(1.0 / VIDEO_FPS_TARGET);
+        if elapsed < target_latency {
+            std::thread::sleep(target_latency - elapsed);
+        } else {
+            log::warn!("Receiver took too long presenting; overshot frame deadline by {} ms", (elapsed - target_latency).as_millis());
         }
     }
 }
