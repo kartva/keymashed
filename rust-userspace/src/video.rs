@@ -199,28 +199,28 @@ impl<'a> Iterator for YUVFrameMacroblockIterator<'a> {
 // ref: https://github.com/autergame/JpegView-Rust/blob/main/src/jpeg.rs
 /// Standard JPEG luminance quantization table
 #[rustfmt::skip]
-const LUMINANCE_QUANTIZATION_TABLE: [[f32; 8]; 8] = [
-	[16.0f32, 11.0f32, 10.0f32, 16.0f32,  24.0f32,  40.0f32,  51.0f32,  61.0f32],
-	[12.0f32, 12.0f32, 14.0f32, 19.0f32,  26.0f32,  58.0f32,  60.0f32,  55.0f32],
-	[14.0f32, 13.0f32, 16.0f32, 24.0f32,  40.0f32,  57.0f32,  69.0f32,  56.0f32],
-	[14.0f32, 17.0f32, 22.0f32, 29.0f32,  51.0f32,  87.0f32,  80.0f32,  62.0f32],
-	[18.0f32, 22.0f32, 37.0f32, 56.0f32,  68.0f32, 109.0f32, 103.0f32,  77.0f32],
-	[24.0f32, 35.0f32, 55.0f32, 64.0f32,  81.0f32, 104.0f32, 113.0f32,  92.0f32],
-	[49.0f32, 64.0f32, 78.0f32, 87.0f32, 103.0f32, 121.0f32, 120.0f32, 101.0f32],
-	[72.0f32, 92.0f32, 95.0f32, 98.0f32, 112.0f32, 100.0f32, 103.0f32,  99.0f32]
+const LUMINANCE_QUANTIZATION_TABLE: [[f64; 8]; 8] = [
+	[16.0f64, 11.0f64, 10.0f64, 16.0f64,  24.0f64,  40.0f64,  51.0f64,  61.0f64],
+	[12.0f64, 12.0f64, 14.0f64, 19.0f64,  26.0f64,  58.0f64,  60.0f64,  55.0f64],
+	[14.0f64, 13.0f64, 16.0f64, 24.0f64,  40.0f64,  57.0f64,  69.0f64,  56.0f64],
+	[14.0f64, 17.0f64, 22.0f64, 29.0f64,  51.0f64,  87.0f64,  80.0f64,  62.0f64],
+	[18.0f64, 22.0f64, 37.0f64, 56.0f64,  68.0f64, 109.0f64, 103.0f64,  77.0f64],
+	[24.0f64, 35.0f64, 55.0f64, 64.0f64,  81.0f64, 104.0f64, 113.0f64,  92.0f64],
+	[49.0f64, 64.0f64, 78.0f64, 87.0f64, 103.0f64, 121.0f64, 120.0f64, 101.0f64],
+	[72.0f64, 92.0f64, 95.0f64, 98.0f64, 112.0f64, 100.0f64, 103.0f64,  99.0f64]
 ];
 
 /// Standard JPEG chrominance quantization table
 #[rustfmt::skip]
-const CHROMINANCE_QUANTIZATION_TABLE: [[f32; 8]; 8] = [
-	[17.0f32, 18.0f32, 24.0f32, 47.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32],
-	[18.0f32, 21.0f32, 26.0f32, 66.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32],
-	[24.0f32, 26.0f32, 56.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32],
-	[47.0f32, 66.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32],
-	[99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32],
-	[99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32],
-	[99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32],
-	[99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32, 99.0f32]
+const CHROMINANCE_QUANTIZATION_TABLE: [[f64; 8]; 8] = [
+	[17.0f64, 18.0f64, 24.0f64, 47.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64],
+	[18.0f64, 21.0f64, 26.0f64, 66.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64],
+	[24.0f64, 26.0f64, 56.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64],
+	[47.0f64, 66.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64],
+	[99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64],
+	[99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64],
+	[99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64],
+	[99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64]
 ];
 
 /// JPEG color component quantization strategy
@@ -230,91 +230,231 @@ enum QuantizationType {
     Chrominance,
 }
 
-fn dct_alpha(u: usize) -> f32 {
+fn dct_alpha(u: usize) -> f64 {
     if u == 0 {
-        1.0 / (2.0f32).sqrt()
+        1.0 / (2.0f64).sqrt()
     } else {
         1.0
     }
 }
 
+/* 
+ * Computes the scaled DCT type II on the given length-8 array in place.
+ * The inverse of this function is inverse_transform(), except for rounding errors.
+ */
+pub fn transform(vector: &mut [f64; 8]) {
+	// Algorithm by Arai, Agui, Nakajima, 1988. For details, see:
+	// https://web.stanford.edu/class/ee398a/handouts/lectures/07-TransformCoding.pdf#page=30
+	let v0 = vector[0] + vector[7];
+	let v1 = vector[1] + vector[6];
+	let v2 = vector[2] + vector[5];
+	let v3 = vector[3] + vector[4];
+	let v4 = vector[3] - vector[4];
+	let v5 = vector[2] - vector[5];
+	let v6 = vector[1] - vector[6];
+	let v7 = vector[0] - vector[7];
+	
+	let v8 = v0 + v3;
+	let v9 = v1 + v2;
+	let v10 = v1 - v2;
+	let v11 = v0 - v3;
+	let v12 = -v4 - v5;
+	let v13 = (v5 + v6) * A[3];
+	let v14 = v6 + v7;
+	
+	let v15 = v8 + v9;
+	let v16 = v8 - v9;
+	let v17 = (v10 + v11) * A[1];
+	let v18 = (v12 + v14) * A[5];
+	
+	let v19 = -v12 * A[2] - v18;
+	let v20 = v14 * A[4] - v18;
+	
+	let v21 = v17 + v11;
+	let v22 = v11 - v17;
+	let v23 = v13 + v7;
+	let v24 = v7 - v13;
+	
+	let v25 = v19 + v24;
+	let v26 = v23 + v20;
+	let v27 = v23 - v20;
+	let v28 = v24 - v19;
+	
+	vector[0] = (S[0] * v15) / 8.0f64.sqrt();
+	vector[1] = (S[1] * v26) / 2.0;
+	vector[2] = (S[2] * v21) / 2.0;
+	vector[3] = (S[3] * v28) / 2.0;
+	vector[4] = (S[4] * v16) / 2.0;
+	vector[5] = (S[5] * v25) / 2.0;
+	vector[6] = (S[6] * v22) / 2.0;
+	vector[7] = (S[7] * v27) / 2.0;
+}
+
+
+/* 
+ * Computes the scaled DCT type III on the given length-8 array in place.
+ * The inverse of this function is transform(), except for rounding errors.
+ */
+pub fn inverse_transform(vector: &mut [f64; 8]) {
+    vector[0] *= 8.0f64.sqrt();
+    for i in 1..8 {
+        vector[i] *= 2.0;
+    }
+
+	// A straightforward inverse of the forward algorithm
+	let v15 = vector[0] / S[0];
+	let v26 = vector[1] / S[1];
+	let v21 = vector[2] / S[2];
+	let v28 = vector[3] / S[3];
+	let v16 = vector[4] / S[4];
+	let v25 = vector[5] / S[5];
+	let v22 = vector[6] / S[6];
+	let v27 = vector[7] / S[7];
+	
+	let v19 = (v25 - v28) / 2.0;
+	let v20 = (v26 - v27) / 2.0;
+	let v23 = (v26 + v27) / 2.0;
+	let v24 = (v25 + v28) / 2.0;
+	
+	let v7  = (v23 + v24) / 2.0;
+	let v11 = (v21 + v22) / 2.0;
+	let v13 = (v23 - v24) / 2.0;
+	let v17 = (v21 - v22) / 2.0;
+	
+	let v8 = (v15 + v16) / 2.0;
+	let v9 = (v15 - v16) / 2.0;
+	
+	let v18 = (v19 - v20) * A[5];  // Different from original
+	let v12 = (v19 * A[4] - v18) / (A[2] * A[5] - A[2] * A[4] - A[4] * A[5]);
+	let v14 = (v18 - v20 * A[2]) / (A[2] * A[5] - A[2] * A[4] - A[4] * A[5]);
+	
+	let v6 = v14 - v7;
+	let v5 = v13 / A[3] - v6;
+	let v4 = -v5 - v12;
+	let v10 = v17 / A[1] - v11;
+	
+	let v0 = (v8 + v11) / 2.0;
+	let v1 = (v9 + v10) / 2.0;
+	let v2 = (v9 - v10) / 2.0;
+	let v3 = (v8 - v11) / 2.0;
+	
+	vector[0] = (v0 + v7) / 2.0;
+	vector[1] = (v1 + v6) / 2.0;
+	vector[2] = (v2 + v5) / 2.0;
+	vector[3] = (v3 + v4) / 2.0;
+	vector[4] = (v3 - v4) / 2.0;
+	vector[5] = (v2 - v5) / 2.0;
+	vector[6] = (v1 - v6) / 2.0;
+	vector[7] = (v0 - v7) / 2.0;
+}
+
+
+/*---- Tables of constants ----*/
+
+const S: [f64; 8] = [
+	0.353553390593273762200422,
+	0.254897789552079584470970,
+	0.270598050073098492199862,
+	0.300672443467522640271861,
+	0.353553390593273762200422,
+	0.449988111568207852319255,
+	0.653281482438188263928322,
+	1.281457723870753089398043,
+];
+
+const A: [f64; 6] = [
+	std::f64::NAN,
+	0.707106781186547524400844,
+	0.541196100146196984399723,
+	0.707106781186547524400844,
+	1.306562964876376527856643,
+	0.382683432365089771728460,
+];
+
 // From https://en.wikipedia.org/wiki/JPEG#JPEG_codec_example
-fn dct2d(block: &[[u8; 8]; 8]) -> [[f32; 8]; 8] {
+fn dct2d(block: &[[u8; 8]; 8]) -> [[f64; 8]; 8] {
     let mut out = [[0.0; 8]; 8];
 
-    for u in 0..8 {
-        for v in 0..8 {
-            let mut sum = 0.0;
-            for x in 0..8 {
-                for y in 0..8 {
-                    sum += dct_alpha(u) * dct_alpha(v) * (block[x][y] as f32 - 128.0)
-                        * (std::f32::consts::PI * (2.0 * (x as f32) + 1.0) * (u as f32) / 16.0)
-                            .cos()
-                        * (std::f32::consts::PI * (2.0 * (y as f32) + 1.0) * (v as f32) / 16.0)
-                            .cos();
-                }
-            }
-            out[u][v] = sum / 4.0;
+    // DCT over rows
+    for i in 0..8 {
+        out[i] = block[i].map(|x| x as f64);
+        transform(&mut out[i]);
+    }
+
+    // DCT over columns
+    for i in 0..8 {
+        let mut column = [0.0; 8];
+        for j in 0..8 {
+            column[j] = block[j][i] as f64;
+        }
+        transform(&mut column);
+        for j in 0..8 {
+            out[j][i] = column[j];
         }
     }
+
     out
 }
 
-fn inverse_dct2d(block: &[[f32; 8]; 8]) -> [[u8; 8]; 8] {
+fn inverse_dct2d(block: &[[f64; 8]; 8]) -> [[u8; 8]; 8] {
     let mut out = [[0; 8]; 8];
 
-    for x in 0..8 {
-        for y in 0..8 {
-            let mut sum = 0.0;
-            for u in 0..8 {
-                for v in 0..8 {
-                    sum += dct_alpha(u) * dct_alpha(v) * block[u][v]
-                        * (std::f32::consts::PI * (2.0 * (x as f32) + 1.0) * (u as f32) / 16.0)
-                            .cos()
-                        * (std::f32::consts::PI * (2.0 * (y as f32) + 1.0) * (v as f32) / 16.0)
-                            .cos();
-                }
-            }
-            out[x][y] = (sum / 4.0 + 128.0) as u8;
+    // IDCT over rows
+    for i in 0..8 {
+        let mut row = block[i];
+        inverse_transform(&mut row);
+        for j in 0..8 {
+            out[i][j] = row[j].round() as u8;
         }
     }
+
+    // IDCT over columns
+    for i in 0..8 {
+        let mut column = [0.0; 8];
+        for j in 0..8 {
+            column[j] = out[j][i] as f64;
+        }
+        inverse_transform(&mut column);
+        for j in 0..8 {
+            out[j][i] = column[j].round() as u8;
+        }
+    }
+
     out
 }
 
 /// Quantizes DCT block with flexible quantization. Returns a signed value.
-fn quantize_block(dct_block: &[[f32; 8]; 8], quantization_table: &[[f32; 8]; 8]) -> [[i8; 8]; 8] {
-    dct_block.map(|row| {
-        row.iter()
-            .zip(quantization_table.iter().flat_map(|r| r.iter()))
-            .map(|(&coef, &quant)| (coef / quant as f32).round() as i8)
-            .collect::<Vec<i8>>()
-            .try_into()
-            .expect("Quantization block size mismatch")
-    })
+fn quantize_block(dct_block: &[[f64; 8]; 8], quantization_table: &[[f64; 8]; 8]) -> [[i8; 8]; 8] {
+    let mut result = [[0; 8]; 8];
+    for i in 0..8 {
+        for j in 0..8 {
+           result[i][j] = (dct_block[i][j] / quantization_table[i][j]).round() as i8;
+        }
+    }
+    result
 }
 
 /// Entry-for-entry product of quantized block and quantization table.
 fn dequantize_block(
     quantized_block: &[[i8; 8]; 8],
-    quantization_table: &[[f32; 8]; 8],
-) -> [[f32; 8]; 8] {
-    quantized_block.map(|row| {
-        row.iter()
-            .zip(quantization_table.iter().flat_map(|r| r.iter()))
-            .map(|(&coef, &quant)| coef as f32 * quant as f32)
-            .collect::<Vec<f32>>()
-            .try_into()
-            .expect("Dequantization block size mismatch")
-    })
+    quantization_table: &[[f64; 8]; 8],
+) -> [[f64; 8]; 8] {
+    let mut result = [[0.0; 8]; 8];
+    for i in 0..8 {
+        for j in 0..8 {
+            result[i][j] = quantized_block[i][j] as f64 * quantization_table[i][j];
+        }
+    }
+    result
 }
 
 /// Quality ranges from 0 to 100.
-fn quality_scaled_q_matrix(q_matrix: &[[f32; 8]; 8], quality: f32) -> [[f32; 8]; 8] {
-    let factor = 25.0f32 * ((101.0f32 - quality) * 0.01f32);
+fn quality_scaled_q_matrix(q_matrix: &[[f64; 8]; 8], quality: f64) -> [[f64; 8]; 8] {
+    let factor = 25.0f64 * ((101.0f64 - quality) * 0.01f64);
     q_matrix.map(|row| row.map(|x| x * factor))
 }
 
-const QUALITY_LEVEL: f32 = 80.0;
+const QUALITY_LEVEL: f64 = 80.0;
 
 /// Process an entire YUV block for DCT and quantization
 pub fn quantize_macroblock(block: &Macroblock) -> QuantizedMacroblock {
@@ -419,12 +559,12 @@ use crate::{VIDEO_HEIGHT, VIDEO_WIDTH};
 /// Currently performs RLE encoding.
 fn encode_quantized_block(block: &[[i8; 8]; 8], buf: &mut Vec<u8>) {
     let zig_zag_block = QuantizedZigZagBlock::new_ref(block);
-    let buf_start = buf.len();
+    // let buf_start = buf.len();
 
-    let mut zig_zag_out = Vec::new();
-    for i in 0..64 {
-        zig_zag_out.push(zig_zag_block[i]);
-    }
+    // let mut zig_zag_out = Vec::new();
+    // for i in 0..64 {
+    //     zig_zag_out.push(zig_zag_block[i]);
+    // }
 
     let mut index = 0;
 
@@ -446,11 +586,11 @@ fn encode_quantized_block(block: &[[i8; 8]; 8], buf: &mut Vec<u8>) {
         buf.push(run_length);
     }
 
-    let mut s = String::new();
-    for chunk in buf[buf_start..].chunks(2) {
-        s.push_str(&format!("{:02x}x{} ", chunk[0], chunk[1]));
-    }
-    log::trace!("{zig_zag_out:?} -> {}", s);
+    // let mut s = String::new();
+    // for chunk in buf[buf_start..].chunks(2) {
+    //     s.push_str(&format!("{:02x}x{} ", chunk[0], chunk[1]));
+    // }
+    // log::trace!("{zig_zag_out:?} -> {}", s);
 }
 
 pub fn encode_quantized_macroblock(quantized_macroblock: &QuantizedMacroblock, buf: &mut Vec<u8>) {
@@ -475,25 +615,25 @@ fn decode_quantized_block(data: &[u8]) -> ([[i8; 8]; 8], &[u8]) {
     let mut encoded_data_index = 0;
     let mut zig_zag_index = 0;
 
-    let mut zig_zag_out = Vec::new();
-    let mut s = String::new();
+    // let mut zig_zag_out = Vec::new();
+    // let mut s = String::new();
 
     while zig_zag_index < quantized_block.len() {
         let value = data[encoded_data_index];
         let run_length = data[encoded_data_index + 1];
 
-        s.push_str(&format!("{:02x}x{} ", value, run_length));
+        // s.push_str(&format!("{:02x}x{} ", value, run_length));
 
         encoded_data_index += 2;
 
         for _ in 0..run_length {
             quantized_block[zig_zag_index] = value as i8;
-            zig_zag_out.push(value as i8);
+            // zig_zag_out.push(value as i8);
             zig_zag_index += 1;
         }
     }
 
-    log::trace!("{} -> {zig_zag_out:?}", s);
+    // log::trace!("{} -> {zig_zag_out:?}", s);
 
     (block, &data[encoded_data_index..])
 }

@@ -1,3 +1,5 @@
+#![feature(generic_const_exprs)]
+
 use run_louder::*;
 
 use bytes::{Buf, BufMut, Bytes};
@@ -59,15 +61,18 @@ pub fn send_video() {
         let mut packet_buf = Vec::new();
 
         packet_buf.put_u32(frame_count);
+        let mut current_macroblock_buf = Vec::with_capacity(PACKET_SEND_THRESHOLD);
+
         for MacroblockWithPosition {x, y, block} in YUVFrameMacroblockIterator::new(&frame) {
+            current_macroblock_buf.clear();
+
             let quantized_macroblock = quantize_macroblock(&block);
 
-            let mut mb_buf = Vec::new();
-            mb_buf.put_u16(x as u16);
-            mb_buf.put_u16(y as u16);
-            encode_quantized_macroblock(&quantized_macroblock, &mut mb_buf);
+            current_macroblock_buf.put_u16(x as u16);
+            current_macroblock_buf.put_u16(y as u16);
+            encode_quantized_macroblock(&quantized_macroblock, &mut current_macroblock_buf);
 
-            if packet_buf.len() + mb_buf.len() + 4 >= PACKET_SEND_THRESHOLD {
+            if packet_buf.len() + current_macroblock_buf.len() + 4 >= PACKET_SEND_THRESHOLD {
                 // send the packet and start a new one
                 packet_buf.put_u16(u16::MAX);
                 packet_buf.put_u16(u16::MAX);
@@ -78,7 +83,7 @@ pub fn send_video() {
 
             // The macroblock consists of x, y, and the encoded macroblock
             log::trace!("Storing macroblock at ({}, {}, {}) at cursor position {}", frame_count, x, y, packet_buf.len());
-            packet_buf.put_slice(&mb_buf);
+            packet_buf.put_slice(&current_macroblock_buf);
         }
 
         log::info!("Sent frame {}", frame_count);
