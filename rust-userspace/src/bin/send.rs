@@ -52,6 +52,21 @@ fn receive_control(quality: Arc<RwLock<f64>>, mut stream: TcpStream) {
 }
 
 pub fn send_video() {
+    log::info!("Starting camera!");
+
+    let mut camera = rscam::Camera::new("/dev/video1").unwrap();
+
+    dbg!(camera.intervals(b"YUYV", (VIDEO_WIDTH as _, VIDEO_HEIGHT as _)).expect("interval information is available"));
+
+    camera
+        .start(&rscam::Config {
+            interval: (1, VIDEO_FPS_TARGET as _),
+            resolution: (VIDEO_WIDTH as _, VIDEO_HEIGHT as _),
+            format: b"YUYV",
+            ..Default::default()
+        })
+        .unwrap();
+
     let sock = std::net::UdpSocket::bind(VIDEO_SEND_ADDR).unwrap();
 
     sock.connect(VIDEO_DEST_ADDR).unwrap();
@@ -76,18 +91,6 @@ pub fn send_video() {
 
     let mut sender: RtpSender<[u8]> = rtp::RtpSender::new(sock);
     let sender = Arc::new(Mutex::new(&mut sender));
-
-    log::info!("Starting to send video!");
-
-    let mut camera = rscam::Camera::new("/dev/video1").unwrap();
-    camera
-        .start(&rscam::Config {
-            interval: (1, 30),
-            resolution: (VIDEO_WIDTH as _, VIDEO_HEIGHT as _),
-            format: b"YUYV",
-            ..Default::default()
-        })
-        .unwrap();
 
     let mut frame_count = 0;
     loop {
@@ -157,7 +160,7 @@ pub fn send_video() {
             sender.lock().unwrap().send(&packet_buf);
         }
 
-        const PAR_PACKET_SPAN: usize = 32;
+        const PAR_PACKET_SPAN: usize = 16;
         assert!(PAR_PACKET_SPAN % PACKET_X_DIM == 0);
         assert!(PAR_PACKET_SPAN % PACKET_Y_DIM == 0);
 

@@ -127,11 +127,12 @@ fn main() -> std::io::Result<()> {
         let quality = wpm::wpm_to_jpeg_quality(wpm);
         let control_msg = ControlMessage { quality };
         sender_communication_socket.write(control_msg.as_bytes()).unwrap();
-        log::info!("Sent quality update: {}", quality);
+        sender_communication_socket.flush().unwrap();
+        log::debug!("Sent quality update: {}", quality);
 
         // Draw video
 
-        renderer.set_draw_color(Color::CYAN);
+        renderer.set_draw_color(wpm::wpm_to_sdl_color(wpm, Color::GREEN));
         renderer.clear();
 
         texture.with_lock(None, |buffer: &mut [u8], _pitch: usize| {
@@ -162,7 +163,7 @@ fn main() -> std::io::Result<()> {
                     let mut cursor = &p.data.data[..];
                     let packet_frame_count = cursor.get_u32();
                     if packet_frame_count > frame_count {
-                        log::info!("Skipping ahead to frame {}", packet_frame_count);
+                        log::warn!("Skipping ahead to frame {}", packet_frame_count);
                         frame_count = packet_frame_count;
                         packet_index = 0;
                     }
@@ -197,28 +198,6 @@ fn main() -> std::io::Result<()> {
                 }
                 packet_index += 1;
             }
-
-            // Committed for future use:
-            // // write pretty noise to the blocks that weren't written to
-            // for block_y in 0..BLOCK_WRITTEN_HEIGHT {
-            //     for block_x in 0..BLOCK_WRITTEN_WIDTH {
-            //         if !block_written[block_y][block_x] {
-            //             let mut rng = rand::thread_rng();
-            //             for packet_y in 0..PACKET_Y_DIM {
-            //                 for packet_x in 0..PACKET_X_DIM {
-            //                     let y = block_y * PACKET_Y_DIM + packet_y;
-            //                     let x = block_x * PACKET_X_DIM + packet_x;
-            //                     let noise = rng.gen_range(-32..32);
-            //                     let luminance_idx = y * VIDEO_WIDTH as usize * PIXEL_WIDTH + x * PIXEL_WIDTH as usize;
-            //                     let cr_or_cb_idx = y + 1;
-                                
-            //                     buffer[luminance_idx] = buffer[luminance_idx].wrapping_add_signed(noise);
-            //                     buffer[cr_or_cb_idx] = buffer[cr_or_cb_idx].wrapping_add_signed(noise);
-            //                 }
-            //             }        
-            //         }
-            //     }
-            // }
 
             frame_count += 1;
         }).unwrap();

@@ -3,6 +3,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use sdl2::pixels::Color;
+
 /*
 ⠀⠀⣄⠀⠀
 ⠠⢴⣿⡦⠄
@@ -11,7 +13,7 @@ use std::{
 */
 
 const WPM_SATURATION: f64 = 150.0;
-const WORST_PACKET_DROP: u32 = 2 * (u32::MAX / 3); // 66% drop rate at 0 WPM
+const WORST_PACKET_DROP: u32 = 2 * (u32::MAX / 5); // 40% drop rate at 0 WPM
 
 pub fn wpm_to_drop_amt(wpm: f64) -> u32 {
     let clipped_wpm = wpm.min(WPM_SATURATION);
@@ -19,6 +21,19 @@ pub fn wpm_to_drop_amt(wpm: f64) -> u32 {
     let drop_frac = (WPM_SATURATION - clipped_wpm) / WPM_SATURATION;
     // exponentiate drop_fac to make packet drop rate even more apparent
     ((WORST_PACKET_DROP as f64) * f64::powi(drop_frac, 2)) as u32
+}
+
+pub fn wpm_to_sdl_color(wpm: f64, base_color: Color) -> Color {
+    let clipped_wpm = wpm.min(WPM_SATURATION);
+
+    let wpm_frac = clipped_wpm / WPM_SATURATION;
+    let wpm_color = Color::RGB(
+        (base_color.r as f64 * wpm_frac) as u8,
+        (base_color.g as f64 * wpm_frac) as u8,
+        (base_color.b as f64 * wpm_frac) as u8,
+    );
+
+    wpm_color
 }
 
 const WORST_JPEG_QUALITY: f64 = 0.3;
