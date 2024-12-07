@@ -1,6 +1,6 @@
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use std::time::Duration;
-use std::net::UdpSocket;
+use std::net::{Ipv4Addr, UdpSocket};
 use crate::rtp;
 
 use crate::{AUDIO_DEST_ADDR, AUDIO_SEND_ADDR};
@@ -19,6 +19,18 @@ impl AudioCallback for AudioCallbackData {
 
     fn callback(&mut self, out: &mut [f32]) {
         let mut locked_reciever = self.recv.lock_reciever();
+
+        // If the circular buffer hasn't seen enough future packets, wait for more to arrive
+        // Handles the case: sender is falling behind in sending packets.
+        while locked_reciever.early_latest_span() < 5 {
+            log::debug!("Sleeping and waiting for more packets to arrive. Early-latest span {}", locked_reciever.early_latest_span());
+            drop(locked_reciever);
+            std::thread::sleep(Duration::from_millis(
+                (1000 * AUDIO_SAMPLE_COUNT as u64) / (AUDIO_FREQUENCY as u64),
+            ));
+            locked_reciever = self.recv.lock_reciever();
+        }
+
         let recieved_packet = locked_reciever.consume_earliest_packet();
 
         if let Some(packet) = recieved_packet.get_data() {
@@ -37,6 +49,7 @@ impl AudioCallback for AudioCallbackData {
 /// Ensure that the frequency, sample count and bit depth of the sender and reciever match.
 
 pub fn play_audio(audio_subsystem: &sdl2::AudioSubsystem) -> AudioDevice<AudioCallbackData> {
+    log::info!("Binding to audio destination address: {}", AUDIO_DEST_ADDR);
     let sock = UdpSocket::bind(AUDIO_DEST_ADDR).unwrap();
     let recv: rtp::RtpReciever<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH> = rtp::RtpReciever::new(sock);
 
@@ -59,6 +72,7 @@ pub fn play_audio(audio_subsystem: &sdl2::AudioSubsystem) -> AudioDevice<AudioCa
         })
         .unwrap();
 
+    log::info!("Starting to play audio; waiting for packets to queue!");
     // let packets queue up
     std::thread::sleep(Duration::from_secs(1));
 
@@ -95,7 +109,9 @@ impl SquareWave {
 
 /// Start sending audio over a UDP stream. Audio will be sent indefinitely.
 pub fn send_audio() -> ! {
-    let sock = UdpSocket::bind(AUDIO_SEND_ADDR).unwrap();
+    log::info!("Binding to audio send address: {}", AUDIO_SEND_ADDR);
+    let sock = UdpSocket::bind("0.0.0.0:44406").unwrap();
+    log::info!("Connecting to audio destination address: {}", AUDIO_DEST_ADDR);
     sock.connect(AUDIO_DEST_ADDR).unwrap();
     let mut sender = rtp::RtpSender::new(sock);
 
@@ -110,5 +126,6 @@ pub fn send_audio() -> ! {
         std::thread::sleep(Duration::from_millis(
             (1000 * AUDIO_SAMPLE_COUNT as u64) / (AUDIO_FREQUENCY as u64),
         ));
+        log::trace!("Sent audio packet.");
     }
 }
