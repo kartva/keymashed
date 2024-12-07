@@ -127,7 +127,9 @@ impl Macroblock {
 
         for y_offset in (0..16).step_by(2) {
             for x_offset in (0..16).step_by(2) {
+                // 4:2:0 chroma subsampling -> 4:2:2 chroma subsampling
                 frame.set_chroma(x + x_offset, y + y_offset, (self.u[x_offset / 2][y_offset / 2], self.v[x_offset / 2][y_offset / 2]));
+                frame.set_chroma(x + x_offset, y + y_offset + 1, (self.u[x_offset / 2][y_offset / 2], self.v[x_offset / 2][y_offset / 2]));
             }
         }
     }
