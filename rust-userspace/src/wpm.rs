@@ -28,7 +28,8 @@ pub fn wpm_to_jpeg_quality(wpm: f64) -> f64 {
     let clipped_wpm = wpm.min(WPM_SATURATION);
     
     let wpm_ratio = (WPM_SATURATION - clipped_wpm) / WPM_SATURATION;
-    WORST_JPEG_QUALITY - (WORST_JPEG_QUALITY - BEST_JPEG_QUALITY) * f64::powi(wpm_ratio, 2)
+    // flip wpm_ratio so that higher WPMs result in higher quality
+    WORST_JPEG_QUALITY - (WORST_JPEG_QUALITY - BEST_JPEG_QUALITY) * f64::powi(1.0 - wpm_ratio, 1)
 }
 
 pub const CHART_DATA_LENGTH: usize = 1000;
