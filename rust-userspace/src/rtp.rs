@@ -84,7 +84,7 @@ where
 
 /// A circular buffer of RTP packets.
 /// Index into this buffer with a sequence number to get a packet.
-pub struct RtpCircularBuffer<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize>
+pub struct RtpCircularBuffer<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -93,18 +93,18 @@ where
     /// The span of the earliest sequence number and the latest sequence number of a received packet in the buffer.
     /// This can relied on as a hint for how full the buffer is. (i.e. how ahead is the latest received packet?)
     early_latest_span: u32,
-    buf: Box<[MaybeInitPacket<T>; BufferLength]>,
+    buf: Box<[MaybeInitPacket<T>; BUFFER_LENGTH]>,
 }
 
 /// A packet that has been received and is ready to be consumed.
 /// Holds a reference to the buffer it came from. When dropped, the packet is consumed and deleted.
-pub struct ReceivedPacket<'a, T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize>(
-    &'a mut RtpCircularBuffer<T, BufferLength>,
+pub struct ReceivedPacket<'a, T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize>(
+    &'a mut RtpCircularBuffer<T, BUFFER_LENGTH>,
 )
 where
     [(); size_of_packet::<T>()]: Sized;
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize> ReceivedPacket<'_, T, BufferLength>
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize> ReceivedPacket<'_, T, BUFFER_LENGTH>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -123,7 +123,7 @@ where
     }
 }
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize> Drop for ReceivedPacket<'_, T, BufferLength>
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize> Drop for ReceivedPacket<'_, T, BUFFER_LENGTH>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -140,7 +140,7 @@ where
     }
 }
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize> RtpCircularBuffer<T, BufferLength>
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize> RtpCircularBuffer<T, BUFFER_LENGTH>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -158,14 +158,14 @@ where
         RtpCircularBuffer {
             earliest_seq: 0,
             early_latest_span: 0,
-            buf: Box::new([const { Self::generate_default_packet() }; BufferLength]),
+            buf: Box::new([const { Self::generate_default_packet() }; BUFFER_LENGTH]),
         }
     }
 
     /// Returns the slot with the earlist seq_num in the circular buffer.
     /// Note that this slot may or may not contain a packet.
     /// The slot will be consumed upon dropping the returned value.
-    pub fn consume_earliest_packet(&mut self) -> ReceivedPacket<'_, T, BufferLength> {
+    pub fn consume_earliest_packet(&mut self) -> ReceivedPacket<'_, T, BUFFER_LENGTH> {
         ReceivedPacket(self)
     }
 
@@ -250,14 +250,14 @@ impl<T: IntoBytes + Immutable + ?Sized> RtpSender<T> {
     }
 }
 
-pub struct RtpReciever<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BufferLength: usize>
+pub struct RtpReciever<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
-    rtp_circular_buffer: Arc<Mutex<RtpCircularBuffer<T, BufferLength>>>,
+    rtp_circular_buffer: Arc<Mutex<RtpCircularBuffer<T, BUFFER_LENGTH>>>,
 }
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Send + 'static + Debug, const BufferLength: usize> RtpReciever<T, BufferLength>
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Send + 'static + Debug, const BUFFER_LENGTH: usize> RtpReciever<T, BUFFER_LENGTH>
 where
     [(); size_of_packet::<T>()]: Sized,
 {
@@ -276,14 +276,14 @@ where
     }
 
     /// Locks the buffer for interaction.
-    pub fn lock_reciever(&self) -> MutexGuard<'_, RtpCircularBuffer<T, BufferLength>> {
+    pub fn lock_reciever(&self) -> MutexGuard<'_, RtpCircularBuffer<T, BUFFER_LENGTH>> {
         self.rtp_circular_buffer.lock().unwrap()
     }
 }
 
-fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug, const BufferLength: usize>(
+fn accept_thread<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Debug, const BUFFER_LENGTH: usize>(
     sock: UdpSocket,
-    recv: Arc<Mutex<RtpCircularBuffer<T, BufferLength>>>,
+    recv: Arc<Mutex<RtpCircularBuffer<T, BUFFER_LENGTH>>>,
 ) where
     [(); size_of_packet::<T>()]: Sized,
 {
