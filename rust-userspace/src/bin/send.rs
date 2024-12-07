@@ -42,8 +42,9 @@ fn main() -> std::io::Result<()> {
 
 fn receive_control(quality: Arc<RwLock<f64>>, mut stream: TcpStream) {
     let mut msg_buf = [0; size_of::<ControlMessage>()];
+    log::info!("Listening for control server!");
     loop {
-        stream.read(&mut msg_buf).unwrap();
+        stream.read_exact(&mut msg_buf).unwrap();
         let control_msg = ControlMessage::ref_from_bytes(&msg_buf).unwrap();
         log::debug!("Received quality update: {}", control_msg.quality);
         *quality.write().unwrap() = control_msg.quality;
