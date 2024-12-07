@@ -53,7 +53,7 @@ fn main() -> std::io::Result<()> {
     // let _audio = audio::play_audio(&audio_subsystem);
 
     let window = video_subsystem.window("rust-userspace", VIDEO_WIDTH, VIDEO_HEIGHT)
-        .position_centered()
+        .position_centered()//.fullscreen()
         .build().unwrap();
 
     // we don't use vsync here because my monitor runs at 120hz and I don't want to stream at that rate
