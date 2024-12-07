@@ -53,7 +53,7 @@ impl<'a> YUVFrame<'a> {
     }
 
     /// Get the luminance of a pixel at (x, y).
-    fn get_luma(&self, x: usize, y: usize) -> u8 {
+    pub fn get_luma(&self, x: usize, y: usize) -> u8 {
         let pixel = &self.data[y * self.width / 2 + x / 2];
         if x % 2 == 0 {
             pixel.y0
@@ -64,7 +64,7 @@ impl<'a> YUVFrame<'a> {
 
     /// Get the chrominance of a pixel at (x, y).
     /// Returns (Cb, Cr).
-    fn get_chroma(&self, x: usize, y: usize) -> (u8, u8) {
+    pub fn get_chroma(&self, x: usize, y: usize) -> (u8, u8) {
         let pixel = &self.data[y * self.width / 2 + x / 2];
         (pixel.u, pixel.v)
     }
@@ -82,7 +82,7 @@ impl<'a> MutableYUVFrame<'a> {
     }
 
     /// Set the luminance of a pixel at (x, y).
-    fn set_luma(&mut self, x: usize, y: usize, value: u8) {
+    pub fn set_luma(&mut self, x: usize, y: usize, value: u8) {
         let pixel = &mut self.data[y * self.width / 2 + x / 2];
         if x % 2 == 0 {
             pixel.y0 = value;
@@ -92,14 +92,14 @@ impl<'a> MutableYUVFrame<'a> {
     }
 
     /// Set the chrominance of a pixel at (x, y).
-    fn set_chroma(&mut self, x: usize, y: usize, value: (u8, u8)) {
+    pub fn set_chroma(&mut self, x: usize, y: usize, value: (u8, u8)) {
         let pixel = &mut self.data[y * self.width / 2 + x / 2];
         pixel.u = value.0;
         pixel.v = value.1;
     }
 
     /// Get the luminance of a pixel at (x, y).
-    fn get_luma(&self, x: usize, y: usize) -> u8 {
+    pub fn get_luma(&self, x: usize, y: usize) -> u8 {
         let pixel = &self.data[y * self.width / 2 + x / 2];
         if x % 2 == 0 {
             pixel.y0
@@ -110,7 +110,7 @@ impl<'a> MutableYUVFrame<'a> {
 
     /// Get the chrominance of a pixel at (x, y).
     /// Returns (Cb, Cr).
-    fn get_chroma(&self, x: usize, y: usize) -> (u8, u8) {
+    pub fn get_chroma(&self, x: usize, y: usize) -> (u8, u8) {
         let pixel = &self.data[y * self.width / 2 + x / 2];
         (pixel.u, pixel.v)
     }
@@ -120,12 +120,17 @@ impl<'a> MutableYUVFrame<'a> {
 /// with 4 8x8 blocks for Y and 1 8x8 block for U and V each.
 #[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Macroblock {
-    y0: [[u8; 8]; 8],
-    y1: [[u8; 8]; 8],
-    y2: [[u8; 8]; 8],
-    y3: [[u8; 8]; 8],
-    u: [[u8; 8]; 8],
-    v: [[u8; 8]; 8],
+    pub y0: [[u8; 8]; 8],
+    pub y1: [[u8; 8]; 8],
+    pub y2: [[u8; 8]; 8],
+    pub y3: [[u8; 8]; 8],
+    pub u: [[u8; 8]; 8],
+    pub v: [[u8; 8]; 8],
+}
+
+pub struct MacroBlockIterMut<'a> {
+    block: &'a mut Macroblock,
+    block_num: usize,
 }
 
 impl Macroblock {
@@ -150,6 +155,13 @@ impl Macroblock {
                 frame.set_chroma(x + x_offset, y + y_offset, (self.u[x_offset / 2][y_offset / 2], self.v[x_offset / 2][y_offset / 2]));
                 frame.set_chroma(x + x_offset, y + y_offset + 1, (self.u[x_offset / 2][y_offset / 2], self.v[x_offset / 2][y_offset / 2]));
             }
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> MacroBlockIterMut {
+        MacroBlockIterMut {
+            block: self,
+            block_num: 0
         }
     }
 }
@@ -278,20 +290,17 @@ fn dequantize_block(
     result
 }
 
-/// Range quality from 0.1 to 0.03. (Lower is better)
+/// Range quality from 0.3 to 0.03. (Lower is better)
 fn quality_scaled_q_matrix(q_matrix: &[[f64; 8]; 8], quality: f64) -> [[f64; 8]; 8] {
-    let factor = 0.03;
-    q_matrix.map(|row| row.map(|x| x * factor))
+    q_matrix.map(|row| row.map(|x| x * quality))
 }
 
-const QUALITY_LEVEL: f64 = 90.0;
-
 /// Process an entire YUV block for DCT and quantization
-pub fn quantize_macroblock(block: &Macroblock) -> QuantizedMacroblock {
+pub fn quantize_macroblock(block: &Macroblock, quality: f64) -> QuantizedMacroblock {
     let quality_scaled_luminance_q_matrix =
-        quality_scaled_q_matrix(&LUMINANCE_QUANTIZATION_TABLE, QUALITY_LEVEL);
+        quality_scaled_q_matrix(&LUMINANCE_QUANTIZATION_TABLE, quality);
     let quality_scaled_chrominance_q_matrix =
-        quality_scaled_q_matrix(&CHROMINANCE_QUANTIZATION_TABLE, QUALITY_LEVEL);
+        quality_scaled_q_matrix(&CHROMINANCE_QUANTIZATION_TABLE, quality);
 
     QuantizedMacroblock {
         y0: quantize_block(&dct::dct2d(&block.y0), &quality_scaled_luminance_q_matrix),
@@ -303,11 +312,11 @@ pub fn quantize_macroblock(block: &Macroblock) -> QuantizedMacroblock {
     }
 }
 
-pub fn dequantize_macroblock(block: &QuantizedMacroblock) -> Macroblock {
+pub fn dequantize_macroblock(block: &QuantizedMacroblock, quality: f64) -> Macroblock {
     let quality_scaled_luminance_q_matrix =
-    quality_scaled_q_matrix(&LUMINANCE_QUANTIZATION_TABLE, QUALITY_LEVEL);
+    quality_scaled_q_matrix(&LUMINANCE_QUANTIZATION_TABLE, quality);
     let quality_scaled_chrominance_q_matrix =
-        quality_scaled_q_matrix(&CHROMINANCE_QUANTIZATION_TABLE, QUALITY_LEVEL);
+        quality_scaled_q_matrix(&CHROMINANCE_QUANTIZATION_TABLE, quality);
 
     Macroblock {
         y0: dct::inverse_dct2d(&dequantize_block(&block.y0, &quality_scaled_luminance_q_matrix)),

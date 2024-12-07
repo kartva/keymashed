@@ -1,10 +1,11 @@
 #![feature(generic_const_exprs)]
 
+use rand::Rng;
 use run_louder::*;
 
 use bytes::Buf;
-use sdl2::{self, pixels::PixelFormatEnum};
-use video::{decode_quantized_macroblock, dequantize_macroblock, MutableYUVFrame};
+use sdl2::{self, pixels::{Color, PixelFormatEnum}, rect::Rect};
+use video::{decode_quantized_macroblock, dequantize_macroblock, Macroblock, MutableYUVFrame};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use std::{io::Write, net::UdpSocket, time::Duration};
 
@@ -52,13 +53,25 @@ fn main() -> std::io::Result<()> {
     // let audio_subsystem = sdl_context.audio().unwrap();
     // let _audio = audio::play_audio(&audio_subsystem);
 
-    let window = video_subsystem.window("rust-userspace", VIDEO_WIDTH, VIDEO_HEIGHT)
-        .position_centered()//.fullscreen()
-        .build().unwrap();
+    let display_mode = video_subsystem.desktop_display_mode(0).unwrap();
 
+    let window = video_subsystem.window("rust-userspace", display_mode.w as u32, display_mode.h as u32)
+        .position_centered().fullscreen_desktop()
+        .build().unwrap();
     // we don't use vsync here because my monitor runs at 120hz and I don't want to stream at that rate
 
     let mut renderer = window.into_canvas().accelerated().build().unwrap();
+
+    // Get the window's current size
+    let (window_width, window_height) = renderer.output_size().unwrap();
+
+    // Calculate the position to center the texture at its original resolution
+    let x = (window_width - VIDEO_WIDTH) / 2;
+    let y = (window_height - VIDEO_HEIGHT) / 2;
+
+    // Create a destination rectangle for the texture at its original size
+    let dest_rect = Rect::new(x as i32, y as i32, VIDEO_WIDTH, VIDEO_HEIGHT);
+
 
     let texture_creator = renderer.texture_creator();
     let mut texture = texture_creator.create_texture_streaming(PixelFormatEnum::YUY2, VIDEO_WIDTH, VIDEO_HEIGHT).unwrap();
@@ -81,6 +94,9 @@ fn main() -> std::io::Result<()> {
             }
         }
 
+        renderer.set_draw_color(Color::CYAN);
+        renderer.clear();
+
         texture.with_lock(None, |buffer: &mut [u8], _pitch: usize| {
             log::info!("Playing frame {}", frame_count);
             
@@ -93,6 +109,11 @@ fn main() -> std::io::Result<()> {
                 log::debug!("Sleeping and waiting for more packets to arrive. Early-latest span {}", locked_video_reciever.early_latest_span());
                 return;
             }
+
+            const BLOCK_WRITTEN_WIDTH: usize = (VIDEO_WIDTH as usize) / PACKET_X_DIM;
+            const BLOCK_WRITTEN_HEIGHT: usize = (VIDEO_HEIGHT as usize) / PACKET_Y_DIM;
+
+            let mut block_written = [[false; BLOCK_WRITTEN_WIDTH]; BLOCK_WRITTEN_HEIGHT];
 
             while (packet_index as u32) < (VIDEO_HEIGHT * VIDEO_WIDTH * PIXEL_WIDTH as u32 / PACKET_SIZE as u32) {
                 // if we have a packet with a higher frame number, earlier packets have been dropped from the circular buffer
@@ -121,26 +142,51 @@ fn main() -> std::io::Result<()> {
                         let cursor_position = cursor_start_len - cursor.remaining();
                         let x = cursor.get_u16() as usize;
                         let y = cursor.get_u16() as usize;
+                        let quality = cursor.get_f64();
 
                         if (x == u16::MAX as usize) && (y == u16::MAX as usize) {
                             break;
                         }
 
+                        block_written[y / PACKET_Y_DIM][x / PACKET_X_DIM] = true;
+
                         log::trace!("Receiving MacroblockWithPos at ({frame_count}, {x}, {y}) at cursor position {cursor_position}");
 
                         let decoded_quantized_macroblock;
                         (decoded_quantized_macroblock, cursor) = decode_quantized_macroblock(&cursor);
-                        let macroblock = dequantize_macroblock(&decoded_quantized_macroblock);
+                        let macroblock = dequantize_macroblock(&decoded_quantized_macroblock, quality);
                         macroblock.copy_to_yuv422_frame(MutableYUVFrame::new(VIDEO_WIDTH as usize, VIDEO_HEIGHT as usize, buffer), x, y);
                     }
                 }
                 packet_index += 1;
             }
+
+            // Committed for future use:
+            // // write pretty noise to the blocks that weren't written to
+            // for block_y in 0..BLOCK_WRITTEN_HEIGHT {
+            //     for block_x in 0..BLOCK_WRITTEN_WIDTH {
+            //         if !block_written[block_y][block_x] {
+            //             let mut rng = rand::thread_rng();
+            //             for packet_y in 0..PACKET_Y_DIM {
+            //                 for packet_x in 0..PACKET_X_DIM {
+            //                     let y = block_y * PACKET_Y_DIM + packet_y;
+            //                     let x = block_x * PACKET_X_DIM + packet_x;
+            //                     let noise = rng.gen_range(-32..32);
+            //                     let luminance_idx = y * VIDEO_WIDTH as usize * PIXEL_WIDTH + x * PIXEL_WIDTH as usize;
+            //                     let cr_or_cb_idx = y + 1;
+                                
+            //                     buffer[luminance_idx] = buffer[luminance_idx].wrapping_add_signed(noise);
+            //                     buffer[cr_or_cb_idx] = buffer[cr_or_cb_idx].wrapping_add_signed(noise);
+            //                 }
+            //             }        
+            //         }
+            //     }
+            // }
+
             frame_count += 1;
         }).unwrap();
 
-        renderer.clear();
-        renderer.copy(&texture, None, None).unwrap();
+        renderer.copy(&texture, None, dest_rect).unwrap();
         renderer.present();
 
         let elapsed = start_time.elapsed();

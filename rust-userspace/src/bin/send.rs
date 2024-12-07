@@ -70,16 +70,22 @@ pub fn send_video() {
             for MacroblockWithPosition {x, y, block} in YUVFrameMacroblockIterator::new_with_bounds(frame, x, y, x_end, y_end) {
                 current_macroblock_buf.clear();
 
-                let quantized_macroblock = quantize_macroblock(&block);
+                // get quality
+                // cycle quality between 0.3 and 0.03 based on the current time
+                let quality = 0.3 - 0.27 * (frame_count as f64 * 0.1).sin();
+
+                let quantized_macroblock = quantize_macroblock(&block, quality);
 
                 current_macroblock_buf.put_u16(x as u16);
                 current_macroblock_buf.put_u16(y as u16);
+                current_macroblock_buf.put_f64(quality);
                 encode_quantized_macroblock(&quantized_macroblock, &mut current_macroblock_buf);
 
                 if packet_buf.len() + current_macroblock_buf.len() + 4 >= PACKET_SEND_THRESHOLD {
                     // send the packet and start a new one
                     packet_buf.put_u16(u16::MAX);
                     packet_buf.put_u16(u16::MAX);
+                    packet_buf.put_f64(0.0);
                     sender.lock().unwrap().send(&packet_buf);
                     packet_buf.clear();
                     packet_buf.put_u32(frame_count);
