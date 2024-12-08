@@ -14,7 +14,7 @@ pub const VIDEO_WIDTH: u32 = 640;
 pub const VIDEO_HEIGHT: u32 = 480;
 pub const VIDEO_FPS_TARGET: f64 = 20.0;
 
-pub const VIDEO_DELAY: Duration = Duration::from_secs(10 * 60);
+pub const VIDEO_DELAY: Duration = Duration::from_secs(2 * 60);
 // calculate frames per second, multiply by number of seconds to delay
 pub const VIDEO_FRAME_DELAY: usize = (VIDEO_FPS_TARGET * VIDEO_DELAY.as_secs() as f64) as usize;
 
