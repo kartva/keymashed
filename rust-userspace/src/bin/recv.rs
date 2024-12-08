@@ -36,6 +36,8 @@ fn main() -> std::io::Result<()> {
     bpf_write_channel.send(0).unwrap();
 
     let sdl_context = sdl2::init().unwrap();
+
+    sdl2::hint::set_video_minimize_on_focus_loss(false);
     let video_subsystem = sdl_context.video().unwrap();
 
     // let audio_subsystem = sdl_context.audio().unwrap();
