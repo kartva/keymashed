@@ -1,6 +1,7 @@
 #![feature(generic_const_exprs)]
 
 use bytes::Buf;
+use memmap::MmapMut;
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use run_louder::*;
@@ -61,17 +62,23 @@ const FRAME_CIRCULAR_BUFFER_SIZE: usize =
     VIDEO_FRAME_DELAY * VIDEO_HEIGHT as usize * VIDEO_WIDTH as usize * 2;
 
 struct FrameCircularBuffer {
-    buffer: Box<[u8; FRAME_CIRCULAR_BUFFER_SIZE]>,
+    buffer: MmapMut,
     start_frame_num: usize,
     end_frame_num: usize,
 }
 
 impl FrameCircularBuffer {
-    pub fn new() -> Self {
+    pub fn new(fname: &str) -> Self {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(fname)
+            .unwrap();
+        file.set_len(FRAME_CIRCULAR_BUFFER_SIZE as u64).unwrap();
+        let buffer = unsafe { MmapMut::map_mut(&file).unwrap() };
         Self {
-            buffer: Box::new(
-                [0; VIDEO_FRAME_DELAY * VIDEO_HEIGHT as usize * VIDEO_WIDTH as usize * 2],
-            ),
+            buffer,
             start_frame_num: 0,
             end_frame_num: 0,
         }
@@ -175,7 +182,7 @@ pub fn send_video() {
     let mut sender: RtpSender<[u8]> = rtp::RtpSender::new(sock);
     let sender = Arc::new(Mutex::new(&mut sender));
 
-    let mut frame_delay_buffer = FrameCircularBuffer::new();
+    let mut frame_delay_buffer = FrameCircularBuffer::new("frame_buffer");
     let mut frame_count = 0;
 
     for _ in 0..VIDEO_FRAME_DELAY {
