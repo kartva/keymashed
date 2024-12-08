@@ -179,10 +179,12 @@ pub fn send_video() {
     let mut frame_delay_buffer = FrameCircularBuffer::new("frame_buffer");
     let mut frame_count = 0;
 
+    let mut dummy_camera = DummyWebcam::new(VIDEO_HEIGHT as usize, VIDEO_WIDTH as usize);
     for _ in 0..VIDEO_FRAME_DELAY {
-        let frame = camera.capture().unwrap();
+        let frame = dummy_camera.capture().unwrap();
         frame_delay_buffer.push_frame(frame.as_ref());
     }
+    drop(dummy_camera);
 
     loop {
         let frame = camera.capture().unwrap();
