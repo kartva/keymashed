@@ -45,27 +45,47 @@ struct DummyWebcam {
     frame: Vec<u8>,
 }
 
+impl DummyWebcam {
+    fn new(height: usize, width: usize) -> Self {
+        Self {
+            frame_count: 0,
+            frame: Vec::with_capacity(height * width * 2),
+        }
+    }
+
+    fn capture(&mut self) -> Result<&[u8], Infallible> {
+        self.frame_count += 1;
+        self.frame.clear();
+        self.frame
+            .resize(VIDEO_WIDTH as usize * VIDEO_HEIGHT as usize * 2, 0);
+        let frame = self.frame.as_mut_slice();
+
+        for y in 0..VIDEO_HEIGHT as usize {
+            for x in 0..VIDEO_WIDTH as usize {
+                let pixel = &mut frame[(y * VIDEO_WIDTH as usize + x) * PIXEL_WIDTH as usize..(y * VIDEO_WIDTH as usize + x) * PIXEL_WIDTH as usize + 2];
+                pixel[0] = ((x + (self.frame_count as usize)) % u8::MAX as usize) as u8;
+                pixel[1] = ((y + (2 * self.frame_count as usize)) % u8::MAX as usize) as u8;
+            }
+        }
+
+        Ok(self.frame.as_slice())
+    }
+}
+
+
 const FRAME_CIRCULAR_BUFFER_SIZE: usize =
     VIDEO_FRAME_DELAY * VIDEO_HEIGHT as usize * VIDEO_WIDTH as usize * 2;
 
 struct FrameCircularBuffer {
-    buffer: MmapMut,
+    buffer: Box<[u8; FRAME_CIRCULAR_BUFFER_SIZE]>,
     start_frame_num: usize,
     end_frame_num: usize,
 }
 
 impl FrameCircularBuffer {
-    pub fn new(fname: &str) -> Self {
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(fname)
-            .unwrap();
-        file.set_len(FRAME_CIRCULAR_BUFFER_SIZE as u64).unwrap();
-        let buffer = unsafe { MmapMut::map_mut(&file).unwrap() };
+    pub fn new() -> Self {
         Self {
-            buffer,
+            buffer: Box::new([0; FRAME_CIRCULAR_BUFFER_SIZE]),
             start_frame_num: 0,
             end_frame_num: 0,
         }
@@ -96,33 +116,6 @@ impl FrameCircularBuffer {
         } else {
             None
         }
-    }
-}
-
-impl DummyWebcam {
-    fn new(height: usize, width: usize) -> Self {
-        Self {
-            frame_count: 0,
-            frame: Vec::with_capacity(height * width * 2),
-        }
-    }
-
-    fn capture(&mut self) -> Result<&[u8], Infallible> {
-        self.frame_count += 1;
-        self.frame.clear();
-        self.frame
-            .resize(VIDEO_WIDTH as usize * VIDEO_HEIGHT as usize * 2, 0);
-        let frame = self.frame.as_mut_slice();
-
-        for y in 0..VIDEO_HEIGHT as usize {
-            for x in 0..VIDEO_WIDTH as usize {
-                let pixel = &mut frame[(y * VIDEO_WIDTH as usize + x) * PIXEL_WIDTH as usize..(y * VIDEO_WIDTH as usize + x) * PIXEL_WIDTH as usize + 2];
-                pixel[0] = ((x + (self.frame_count as usize)) % u8::MAX as usize) as u8;
-                pixel[1] = ((y + (2 * self.frame_count as usize)) % u8::MAX as usize) as u8;
-            }
-        }
-
-        Ok(self.frame.as_slice())
     }
 }
 
@@ -157,7 +150,7 @@ pub fn send_video() {
     let mut sender: RtpSender<[u8]> = rtp::RtpSender::new(sock);
     let sender = Arc::new(Mutex::new(&mut sender));
 
-    let mut frame_delay_buffer = FrameCircularBuffer::new("frame_buffer");
+    let mut frame_delay_buffer = FrameCircularBuffer::new();
     let mut frame_count = 0;
 
     let mut dummy_camera = DummyWebcam::new(VIDEO_HEIGHT as usize, VIDEO_WIDTH as usize);
