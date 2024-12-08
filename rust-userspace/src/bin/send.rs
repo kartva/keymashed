@@ -181,7 +181,7 @@ pub fn send_video() {
 
     for _ in 0..VIDEO_FRAME_DELAY {
         let frame = camera.capture().unwrap();
-        frame_delay_buffer.push_frame(frame);
+        frame_delay_buffer.push_frame(frame.as_ref());
     }
 
     loop {
