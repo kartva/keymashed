@@ -6,7 +6,7 @@ use bytes::Buf;
 use sdl2::{self, pixels::{Color, PixelFormatEnum}, rect::Rect};
 use video::{decode_quantized_macroblock, dequantize_macroblock, MutableYUVFrame};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-use std::{io::Write, net::UdpSocket, time::Duration};
+use std::{io::Write, net::UdpSocket, thread::sleep, time::Duration};
 
 use simplelog::WriteLogger;
 
@@ -80,8 +80,11 @@ fn main() -> std::io::Result<()> {
     let video_recieving_socket = UdpSocket::bind(VIDEO_DEST_ADDR).unwrap();
     let video_reciever = rtp::RtpReciever::<VideoPacket, 8192>::new(video_recieving_socket);
 
-    let sender_communication_socket = UdpSocket::bind(CONTROL_SEND_ADDR).unwrap();
-    sender_communication_socket.connect(CONTROL_RECV_ADDR).unwrap();
+    println!("Waiting for sender to connect to control server at {}", CONTROL_RECV_ADDR);
+    sleep(Duration::from_secs(4));
+
+    let sender_communication_socket = UdpSocket::bind(CONTROL_RECV_ADDR).unwrap();
+    sender_communication_socket.connect(CONTROL_SEND_ADDR).unwrap();
 
     log::info!("Waiting for sender to connect to control server at {}", CONTROL_RECV_ADDR);
     log::info!("Sender connected to control server from {:?}", sender_communication_socket.local_addr().unwrap());
