@@ -153,20 +153,20 @@ pub fn send_video() {
         })
         .unwrap();
 
-    let sock = udp_connect_retry(VIDEO_SEND_ADDR);
+    let sock = udp_connect_retry(*VIDEO_SEND_ADDR);
 
-    sock.connect(VIDEO_DEST_ADDR).unwrap();
+    sock.connect(*VIDEO_DEST_ADDR).unwrap();
 
     log::info!(
         "Attempting to connect to control server at {}",
-        CONTROL_SEND_ADDR
+        *CONTROL_SEND_ADDR
     );
 
     let quality = Arc::new(RwLock::new(0.3));
 
     // Connect timeout due to packet loss conditions
-    let receiver_communication_socket = udp_connect_retry(CONTROL_SEND_ADDR);
-    receiver_communication_socket.connect(CONTROL_RECV_ADDR).unwrap();
+    let receiver_communication_socket = udp_connect_retry(*CONTROL_SEND_ADDR);
+    receiver_communication_socket.connect(*CONTROL_RECV_ADDR).unwrap();
 
     let cloned_quality = quality.clone();
     std::thread::spawn(|| {

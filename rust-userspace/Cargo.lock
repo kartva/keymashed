@@ -640,6 +640,7 @@ dependencies = [
  "crossterm",
  "fft2d",
  "generic-array",
+ "lazy_static",
  "libbpf-sys",
  "libc",
  "log",
