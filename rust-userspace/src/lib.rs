@@ -56,8 +56,8 @@ pub fn udp_connect_retry(addr: &str) -> std::net::UdpSocket {
             break s
         } else {
             log::error!("Failed to bind to {addr}; retrying in 1 second");
-            eprint!("Failed to bind to {addr}; retrying in 1 second");
-            std::thread::sleep(Duration::from_secs(1));
+            eprintln!("Failed to bind to {addr}; retrying in 2 seconds");
+            std::thread::sleep(Duration::from_secs(2));
         }
     }
 }
