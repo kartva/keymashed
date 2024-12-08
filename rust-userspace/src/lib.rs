@@ -28,17 +28,18 @@ pub const AUDIO_DEST_ADDR: &str = "127.0.0.1:44403";
 
 pub const RECV_HACKERS_IP: &str = "100.100.1.141";
 
-/// The video receiver sends control information to this address.
-pub const CONTROL_SEND_ADDR: &str = "100.100.1.174:44601";
 
-/// The video sender receives control information from this address.
-/// The video receiver hosts the control server on this address.
-pub const CONTROL_RECV_ADDR: &str = "100.100.1.141:51902";
-
-/// The video sender sends video data to this address.
-pub const VIDEO_SEND_ADDR: &str = "100.100.1.174:44001";
-/// The video receiver receives video data from this address.
-pub const VIDEO_DEST_ADDR: &str = "100.100.1.141:44002";
+lazy_static::lazy_static! {
+    /// The video receiver sends control information to this address.
+    pub static ref CONTROL_SEND_ADDR: &'static str = std::env::var("CONTROL_SEND_ADDR").unwrap_or_else(|_| "100.100.1.174:44601".to_string()).leak();
+    /// The video sender receives control information from this address.
+    /// The video receiver hosts the control server on this address.
+    pub static ref CONTROL_RECV_ADDR: &'static str = std::env::var("CONTROL_RECV_ADDR").unwrap_or_else(|_| "100.100.1.141:51902".to_string()).leak();
+    /// The video sender sends video data to this address.
+    pub static ref VIDEO_SEND_ADDR: &'static str = std::env::var("VIDEO_SEND_ADDR").unwrap_or_else(|_| "100.100.1.174:44001".to_string()).leak();
+    /// The video receiver receives video data from this address.
+    pub static ref VIDEO_DEST_ADDR: &'static str = std::env::var("VIDEO_DEST_ADDR").unwrap_or_else(|_| "100.100.1.141:44002".to_string()).leak();
+}
 
 pub const PIXEL_WIDTH: usize = 2;
 pub const PACKET_X_DIM: usize = 16;
@@ -52,10 +53,10 @@ pub struct ControlMessage {
 
 pub fn udp_connect_retry(addr: &str) -> std::net::UdpSocket {
     loop {
-        if let Ok(s) = std::net::UdpSocket::bind(VIDEO_SEND_ADDR) {
+        if let Ok(s) = std::net::UdpSocket::bind(*VIDEO_SEND_ADDR) {
             break s
         } else {
-            log::error!("Failed to bind to {addr}; retrying in 1 second");
+            log::error!("Failed to bind to {addr}; retrying in 2 second");
             eprintln!("Failed to bind to {addr}; retrying in 2 seconds");
             std::thread::sleep(Duration::from_secs(2));
         }
