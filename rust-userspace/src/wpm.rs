@@ -12,7 +12,7 @@ use sdl2::pixels::Color;
 ⠀⠀⣿⠀⠀
 */
 
-const WPM_SATURATION: f64 = 70.0;
+const WPM_SATURATION: f64 = 45.0;
 const WORST_PACKET_DROP: u32 = 2 * (u32::MAX / 5); // 40% drop rate at 0 WPM
 
 pub fn wpm_to_drop_amt(wpm: f64) -> u32 {
