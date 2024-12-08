@@ -1,6 +1,6 @@
 #![feature(generic_const_exprs)]
 
-use std::time::Duration;
+use std::{net::UdpSocket, time::Duration};
 
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
@@ -46,6 +46,13 @@ pub struct ControlMessage {
 
 pub fn init_logger(_is_send: bool) {
     simplelog::SimpleLogger::init(LOG_LEVEL, simplelog::Config::default()).unwrap();
+}
+
+pub fn udp_send_retry(sock: &UdpSocket, buf: &[u8]) {
+    while let Err(e) = sock.send(buf) {
+        log::error!("Error sending packet from {:?} -> {:?}: {}", sock.peer_addr(), sock.local_addr(), e);
+        std::thread::sleep(Duration::from_millis(500));
+    }
 }
 
 pub fn udp_connect_retry<A>(addr: A) -> std::net::UdpSocket

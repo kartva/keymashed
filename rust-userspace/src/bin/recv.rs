@@ -112,7 +112,7 @@ fn main() -> std::io::Result<()> {
         // send desired quality to sender
         let quality = wpm::wpm_to_jpeg_quality(wpm);
         let control_msg = ControlMessage { quality };
-        sender_communication_socket.send(control_msg.as_bytes()).unwrap();
+        udp_send_retry(&sender_communication_socket, control_msg.as_bytes());
         log::debug!("Sent quality update: {}", quality);
 
         // Draw video
