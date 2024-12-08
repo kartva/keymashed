@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{BTreeMap, BTreeSet, VecDeque},
     time::{Duration, Instant},
 };
 
@@ -52,12 +52,14 @@ pub const CHART_DATA_LENGTH: usize = 1000;
 #[derive(Debug)]
 pub struct TypingMetrics {
     stroke_window: VecDeque<(i32, Instant)>,
+    repeated_keys: BTreeMap<i32, u32>,
 }
 
 impl TypingMetrics {
     pub fn new() -> Self {
         Self {
             stroke_window: VecDeque::new(),
+            repeated_keys: BTreeMap::new(),
         }
     }
 
@@ -74,18 +76,20 @@ impl TypingMetrics {
     }
 
     /// Calculate the WPM based on the stored stroke window.
-    fn calculate_wpm(&self) -> f64 {
+    fn calculate_wpm(&mut self) -> f64 {
         // penalize repeated keys
         let mut wpm = 0.0;
-        let mut last_char = None;
+        self.repeated_keys.clear();
+
         for (c, _) in &self.stroke_window {
-            if let Some(last) = last_char {
-                if last == *c {
-                    wpm -= 0.7;
-                }
-            }
-            last_char = Some(*c);
             wpm += 1.0;
+            // repeated keys get higher penalties for each repetition
+            if let Some(times) = self.repeated_keys.get(c) {
+                wpm -= (0.04 * (*times as f64)).max(0.0);
+                self.repeated_keys.insert(*c, times + 1);
+            } else {
+                self.repeated_keys.insert(*c, 1);
+            }
         }
         wpm
     }
