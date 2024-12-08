@@ -26,16 +26,19 @@ pub const PACKET_SEND_THRESHOLD: usize = 1500;
 pub const AUDIO_SEND_ADDR: &str = "127.0.0.1:44406";
 pub const AUDIO_DEST_ADDR: &str = "127.0.0.1:44403";
 
+pub const RECV_HACKERS_IP: &str = "100.100.1.141";
+
 /// The video receiver sends control information to this address.
-pub const CONTROL_SEND_ADDR: &str = "127.0.0.1:44601";
+pub const CONTROL_SEND_ADDR: &str = "100.100.1.174:44601";
+
 /// The video sender receives control information from this address.
 /// The video receiver hosts the control server on this address.
-pub const CONTROL_RECV_ADDR: &str = "127.0.0.1:51902";
+pub const CONTROL_RECV_ADDR: &str = "100.100.1.141:51902";
 
 /// The video sender sends video data to this address.
-pub const VIDEO_SEND_ADDR: &str = "127.0.0.1:44001";
+pub const VIDEO_SEND_ADDR: &str = "100.100.1.174:44001";
 /// The video receiver receives video data from this address.
-pub const VIDEO_DEST_ADDR: &str = "127.0.0.1:44002";
+pub const VIDEO_DEST_ADDR: &str = "100.100.1.141:44002";
 
 pub const PIXEL_WIDTH: usize = 2;
 pub const PACKET_X_DIM: usize = 16;
@@ -45,4 +48,16 @@ pub const PACKET_SIZE: usize = PACKET_X_DIM * PACKET_Y_DIM * PIXEL_WIDTH;
 #[derive(FromBytes, IntoBytes, KnownLayout, Immutable, Debug, Clone, Copy)]
 pub struct ControlMessage {
     pub quality: f64,
+}
+
+pub fn udp_connect_retry(addr: &str) -> std::net::UdpSocket {
+    loop {
+        if let Ok(s) = std::net::UdpSocket::bind(VIDEO_SEND_ADDR) {
+            break s
+        } else {
+            log::error!("Failed to bind to {addr}; retrying in 1 second");
+            eprint!("Failed to bind to {addr}; retrying in 1 second");
+            std::thread::sleep(Duration::from_secs(1));
+        }
+    }
 }

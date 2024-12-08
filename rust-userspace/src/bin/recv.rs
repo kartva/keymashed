@@ -77,16 +77,15 @@ fn main() -> std::io::Result<()> {
     let texture_creator = renderer.texture_creator();
     let mut texture = texture_creator.create_texture_streaming(PixelFormatEnum::YUY2, VIDEO_WIDTH, VIDEO_HEIGHT).unwrap();
 
-    let video_recieving_socket = UdpSocket::bind(VIDEO_DEST_ADDR).unwrap();
+    let video_recieving_socket = udp_connect_retry(VIDEO_DEST_ADDR);
     let video_reciever = rtp::RtpReciever::<VideoPacket, 8192>::new(video_recieving_socket);
 
     println!("Waiting for sender to connect to control server at {}", CONTROL_RECV_ADDR);
-    sleep(Duration::from_secs(4));
+    log::info!("Waiting for sender to connect to control server at {}", CONTROL_RECV_ADDR);
 
-    let sender_communication_socket = UdpSocket::bind(CONTROL_RECV_ADDR).unwrap();
+    let sender_communication_socket = udp_connect_retry(CONTROL_RECV_ADDR);
     sender_communication_socket.connect(CONTROL_SEND_ADDR).unwrap();
 
-    log::info!("Waiting for sender to connect to control server at {}", CONTROL_RECV_ADDR);
     log::info!("Sender connected to control server from {:?}", sender_communication_socket.local_addr().unwrap());
 
     let mut frame_count = 0;

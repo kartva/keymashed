@@ -153,7 +153,7 @@ pub fn send_video() {
         })
         .unwrap();
 
-    let sock = std::net::UdpSocket::bind(VIDEO_SEND_ADDR).unwrap();
+    let sock = udp_connect_retry(VIDEO_SEND_ADDR);
 
     sock.connect(VIDEO_DEST_ADDR).unwrap();
 
@@ -165,7 +165,7 @@ pub fn send_video() {
     let quality = Arc::new(RwLock::new(0.3));
 
     // Connect timeout due to packet loss conditions
-    let receiver_communication_socket = UdpSocket::bind(CONTROL_SEND_ADDR).unwrap();
+    let receiver_communication_socket = udp_connect_retry(CONTROL_SEND_ADDR);
     receiver_communication_socket.connect(CONTROL_RECV_ADDR).unwrap();
 
     let cloned_quality = quality.clone();

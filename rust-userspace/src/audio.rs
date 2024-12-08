@@ -1,7 +1,7 @@
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use std::time::Duration;
 use std::net::{Ipv4Addr, UdpSocket};
-use crate::rtp;
+use crate::{rtp, udp_connect_retry};
 
 use crate::{AUDIO_DEST_ADDR, AUDIO_SEND_ADDR};
 
@@ -50,7 +50,7 @@ impl AudioCallback for AudioCallbackData {
 
 pub fn play_audio(audio_subsystem: &sdl2::AudioSubsystem) -> AudioDevice<AudioCallbackData> {
     log::info!("Binding to audio destination address: {}", AUDIO_DEST_ADDR);
-    let sock = UdpSocket::bind(AUDIO_DEST_ADDR).unwrap();
+    let sock = udp_connect_retry(AUDIO_DEST_ADDR);
     let recv: rtp::RtpReciever<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH> = rtp::RtpReciever::new(sock);
 
     let desired_spec = AudioSpecDesired {
@@ -110,7 +110,7 @@ impl SquareWave {
 /// Start sending audio over a UDP stream. Audio will be sent indefinitely.
 pub fn send_audio() -> ! {
     log::info!("Binding to audio send address: {}", AUDIO_SEND_ADDR);
-    let sock = UdpSocket::bind("0.0.0.0:44406").unwrap();
+    let sock = udp_connect_retry("0.0.0.0:44406");
     log::info!("Connecting to audio destination address: {}", AUDIO_DEST_ADDR);
     sock.connect(AUDIO_DEST_ADDR).unwrap();
     let mut sender = rtp::RtpSender::new(sock);
