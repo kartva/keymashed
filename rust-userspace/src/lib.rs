@@ -18,8 +18,8 @@ pub const VIDEO_DELAY: Duration = Duration::from_secs(10 * 60);
 // calculate frames per second, multiply by number of seconds to delay
 pub const VIDEO_FRAME_DELAY: usize = (VIDEO_FPS_TARGET * VIDEO_DELAY.as_secs() as f64) as usize;
 
-pub const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Off;
-pub const BUFFER_LOGS: bool = false;
+pub const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
+pub const BUFFER_LOGS: bool = true;
 
 pub const PACKET_SEND_THRESHOLD: usize = 1500;
 

@@ -140,7 +140,7 @@ impl DummyWebcam {
 pub fn send_video() {
     log::info!("Starting camera!");
 
-    let mut camera = rscam::Camera::new("/dev/video1").unwrap();
+    let mut camera = rscam::Camera::new("/dev/video0").unwrap();
 
     dbg!(camera.intervals(b"YUYV", (VIDEO_WIDTH as _, VIDEO_HEIGHT as _)).expect("interval information is available"));
 

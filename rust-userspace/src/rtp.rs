@@ -134,7 +134,7 @@ where
             .get_mut(rtp_reciever.earliest_seq)
             .unwrap()
             .init = false;
-        log::debug!("consumed seq {}", rtp_reciever.earliest_seq);
+        log::trace!("consumed seq {}", rtp_reciever.earliest_seq);
         rtp_reciever.earliest_seq = rtp_reciever.earliest_seq.wrapping_add(1);
         rtp_reciever.early_latest_span = rtp_reciever.early_latest_span.saturating_sub(1);
     }
@@ -244,7 +244,7 @@ impl<T: IntoBytes + Immutable + ?Sized> RtpSender<T> {
         packet.put(data.as_ref().as_bytes());
 
         self.sock.send(packet).unwrap();
-        log::debug!("{:?}: Sent packet with seq: {}", self.sock.local_addr(), self.seq_num);
+        log::trace!("sent seq: {}", self.seq_num);
         self.seq_num = self.seq_num.wrapping_add(1);
         self.scratch.clear();
     }

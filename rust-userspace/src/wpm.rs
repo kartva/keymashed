@@ -12,7 +12,7 @@ use sdl2::pixels::Color;
 ⠀⠀⣿⠀⠀
 */
 
-const WPM_SATURATION: f64 = 150.0;
+const WPM_SATURATION: f64 = 70.0;
 const WORST_PACKET_DROP: u32 = 2 * (u32::MAX / 5); // 40% drop rate at 0 WPM
 
 pub fn wpm_to_drop_amt(wpm: f64) -> u32 {
@@ -36,7 +36,7 @@ pub fn wpm_to_sdl_color(wpm: f64, base_color: Color) -> Color {
     wpm_color
 }
 
-const WORST_JPEG_QUALITY: f64 = 0.3;
+const WORST_JPEG_QUALITY: f64 = 1.0;
 const BEST_JPEG_QUALITY: f64 = 0.03;
 
 pub fn wpm_to_jpeg_quality(wpm: f64) -> f64 {

@@ -58,7 +58,7 @@ fn main() -> std::io::Result<()> {
     let display_mode = video_subsystem.desktop_display_mode(0).unwrap();
 
     let window = video_subsystem.window("rust-userspace", display_mode.w as u32, display_mode.h as u32)
-        .position_centered()//.fullscreen_desktop()
+        .position_centered().fullscreen_desktop()
         .build().unwrap();
     // we don't use vsync here because my monitor runs at 120hz and I don't want to stream at that rate
 
