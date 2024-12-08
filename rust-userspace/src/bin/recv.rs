@@ -1,13 +1,12 @@
 #![feature(generic_const_exprs)]
 
-use rand::Rng;
 use run_louder::*;
 
 use bytes::Buf;
 use sdl2::{self, pixels::{Color, PixelFormatEnum}, rect::Rect};
-use video::{decode_quantized_macroblock, dequantize_macroblock, Macroblock, MutableYUVFrame};
+use video::{decode_quantized_macroblock, dequantize_macroblock, MutableYUVFrame};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-use std::{io::Write, net::{TcpListener, TcpStream, UdpSocket}, time::Duration};
+use std::{io::Write, net::UdpSocket, time::Duration};
 
 use simplelog::WriteLogger;
 
@@ -81,10 +80,11 @@ fn main() -> std::io::Result<()> {
     let video_recieving_socket = UdpSocket::bind(VIDEO_DEST_ADDR).unwrap();
     let video_reciever = rtp::RtpReciever::<VideoPacket, 8192>::new(video_recieving_socket);
 
-    let sender_communication_socket = TcpListener::bind(CONTROL_RECV_ADDR).unwrap();
+    let sender_communication_socket = UdpSocket::bind(CONTROL_SEND_ADDR).unwrap();
+    sender_communication_socket.connect(CONTROL_RECV_ADDR).unwrap();
+
     log::info!("Waiting for sender to connect to control server at {}", CONTROL_RECV_ADDR);
-    let (mut sender_communication_socket, sender_addr) = sender_communication_socket.accept().unwrap();
-    log::info!("Sender connected to control server from {sender_addr:?}");
+    log::info!("Sender connected to control server from {:?}", sender_communication_socket.local_addr().unwrap());
 
     let mut frame_count = 0;
     let mut typing_metrics = wpm::TypingMetrics::new();
@@ -126,8 +126,7 @@ fn main() -> std::io::Result<()> {
         // send desired quality to sender
         let quality = wpm::wpm_to_jpeg_quality(wpm);
         let control_msg = ControlMessage { quality };
-        sender_communication_socket.write(control_msg.as_bytes()).unwrap();
-        sender_communication_socket.flush().unwrap();
+        sender_communication_socket.send(control_msg.as_bytes()).unwrap();
         log::debug!("Sent quality update: {}", quality);
 
         // Draw video

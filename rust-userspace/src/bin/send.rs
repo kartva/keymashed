@@ -1,6 +1,5 @@
 #![feature(generic_const_exprs)]
 
-use bytes::Buf;
 use memmap::MmapMut;
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
@@ -9,9 +8,7 @@ use run_louder::*;
 use bytes::BufMut;
 use rtp::RtpSender;
 use std::convert::Infallible;
-use std::io::Read;
-use std::net::TcpStream;
-use std::str::FromStr;
+use std::net::UdpSocket;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::RwLock;
@@ -42,11 +39,11 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn receive_control(quality: Arc<RwLock<f64>>, mut stream: TcpStream) {
+fn receive_control(quality: Arc<RwLock<f64>>, stream: UdpSocket) {
     let mut msg_buf = [0; size_of::<ControlMessage>()];
     log::info!("Listening for control server!");
     loop {
-        stream.read_exact(&mut msg_buf).unwrap();
+        stream.recv(&mut msg_buf).unwrap();
         let control_msg = ControlMessage::ref_from_bytes(&msg_buf).unwrap();
         log::debug!("Received quality update: {}", control_msg.quality);
         *quality.write().unwrap() = control_msg.quality;
@@ -168,11 +165,8 @@ pub fn send_video() {
     let quality = Arc::new(RwLock::new(0.3));
 
     // Connect timeout due to packet loss conditions
-    let receiver_communication_socket = TcpStream::connect_timeout(
-        &std::net::SocketAddr::from_str(CONTROL_RECV_ADDR).unwrap(),
-        Duration::from_secs(3),
-    )
-    .unwrap();
+    let receiver_communication_socket = UdpSocket::bind(CONTROL_SEND_ADDR).unwrap();
+    receiver_communication_socket.connect(CONTROL_RECV_ADDR).unwrap();
 
     let cloned_quality = quality.clone();
     std::thread::spawn(|| {
