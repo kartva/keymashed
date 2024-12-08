@@ -7,6 +7,7 @@ use run_louder::*;
 
 use bytes::BufMut;
 use rtp::RtpSender;
+use std::convert::Infallible;
 use std::io::Read;
 use std::net::TcpStream;
 use std::str::FromStr;
@@ -51,6 +52,87 @@ fn receive_control(quality: Arc<RwLock<f64>>, mut stream: TcpStream) {
     }
 }
 
+struct DummyWebcam {
+    frame_count: u32,
+    frame: Vec<u8>,
+}
+
+const FRAME_CIRCULAR_BUFFER_SIZE: usize =
+    VIDEO_FRAME_DELAY * VIDEO_HEIGHT as usize * VIDEO_WIDTH as usize * 2;
+
+struct FrameCircularBuffer {
+    buffer: Box<[u8; FRAME_CIRCULAR_BUFFER_SIZE]>,
+    start_frame_num: usize,
+    end_frame_num: usize,
+}
+
+impl FrameCircularBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer: Box::new(
+                [0; VIDEO_FRAME_DELAY * VIDEO_HEIGHT as usize * VIDEO_WIDTH as usize * 2],
+            ),
+            start_frame_num: 0,
+            end_frame_num: 0,
+        }
+    }
+
+    pub fn push_frame(&mut self, frame: &[u8]) {
+        if self.start_frame_num == (self.end_frame_num + 1) % VIDEO_FRAME_DELAY {
+            log::error!("Frame buffer full; dropping frame");
+            eprint!("Frame buffer full; dropping frame");
+            return;
+        }
+
+        // copy frame into buffer
+        self.buffer[(self.end_frame_num * VIDEO_HEIGHT as usize * VIDEO_WIDTH as usize * 2)
+            ..((self.end_frame_num + 1) * VIDEO_HEIGHT as usize * VIDEO_WIDTH as usize * 2)]
+            .copy_from_slice(frame);
+        self.end_frame_num = (self.end_frame_num + 1) % VIDEO_FRAME_DELAY;
+    }
+
+    pub fn pop_frame(&mut self) -> Option<&[u8]> {
+        if self.start_frame_num != self.end_frame_num {
+            let frame = &self.buffer[(self.start_frame_num
+                * VIDEO_HEIGHT as usize
+                * VIDEO_WIDTH as usize
+                * 2)
+                ..((self.start_frame_num + 1) * VIDEO_HEIGHT as usize * VIDEO_WIDTH as usize * 2)];
+            self.start_frame_num = (self.start_frame_num + 1) % VIDEO_FRAME_DELAY;
+            Some(frame)
+        } else {
+            None
+        }
+    }
+}
+
+impl DummyWebcam {
+    fn new(height: usize, width: usize) -> Self {
+        Self {
+            frame_count: 0,
+            frame: Vec::with_capacity(height * width * 2),
+        }
+    }
+
+    fn capture(&mut self) -> Result<&[u8], Infallible> {
+        self.frame_count += 1;
+        self.frame.clear();
+        self.frame
+            .resize(VIDEO_WIDTH as usize * VIDEO_HEIGHT as usize * 2, 0);
+        let frame = self.frame.as_mut_slice();
+
+        for y in 0..VIDEO_HEIGHT as usize {
+            for x in 0..VIDEO_WIDTH as usize {
+                let pixel = &mut frame[(y * VIDEO_WIDTH as usize + x) * PIXEL_WIDTH as usize..(y * VIDEO_WIDTH as usize + x) * PIXEL_WIDTH as usize + 2];
+                pixel[0] = ((x + (self.frame_count as usize)) % u8::MAX as usize) as u8;
+                pixel[1] = ((y + (2 * self.frame_count as usize)) % u8::MAX as usize) as u8;
+            }
+        }
+
+        Ok(self.frame.as_slice())
+    }
+}
+
 pub fn send_video() {
     log::info!("Starting camera!");
 
@@ -84,6 +166,7 @@ pub fn send_video() {
         Duration::from_secs(3),
     )
     .unwrap();
+
     let cloned_quality = quality.clone();
     std::thread::spawn(|| {
         receive_control(cloned_quality, receiver_communication_socket);
@@ -92,10 +175,24 @@ pub fn send_video() {
     let mut sender: RtpSender<[u8]> = rtp::RtpSender::new(sock);
     let sender = Arc::new(Mutex::new(&mut sender));
 
+    let mut frame_delay_buffer = FrameCircularBuffer::new();
     let mut frame_count = 0;
+
+    for _ in 0..VIDEO_FRAME_DELAY {
+        let frame = camera.capture().unwrap();
+        frame_delay_buffer.push_frame(frame);
+    }
+
     loop {
         let frame = camera.capture().unwrap();
         let frame: &[u8] = frame.as_ref();
+        frame_delay_buffer.push_frame(frame);
+
+        let frame = match frame_delay_buffer.pop_frame() {
+            Some(frame) => frame,
+            None => panic!("Frame buffer empty"),
+        };
+
         assert!(frame.len() % (VIDEO_WIDTH * PIXEL_WIDTH as u32) as usize == 0);
         assert!(frame.len() / (VIDEO_WIDTH as usize * PIXEL_WIDTH) == VIDEO_HEIGHT as usize);
 

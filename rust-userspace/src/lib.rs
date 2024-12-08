@@ -1,5 +1,7 @@
 #![feature(generic_const_exprs)]
 
+use std::time::Duration;
+
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub mod bpf;
@@ -10,7 +12,11 @@ pub mod video;
 
 pub const VIDEO_WIDTH: u32 = 640;
 pub const VIDEO_HEIGHT: u32 = 480;
-pub const VIDEO_FPS_TARGET: f64 = 30.0;
+pub const VIDEO_FPS_TARGET: f64 = 20.0;
+
+pub const VIDEO_DELAY: Duration = Duration::from_secs(180);
+// calculate frames per second, multiply by number of seconds to delay
+pub const VIDEO_FRAME_DELAY: usize = (VIDEO_FPS_TARGET * VIDEO_DELAY.as_secs() as f64) as usize;
 
 pub const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Off;
 pub const BUFFER_LOGS: bool = false;
