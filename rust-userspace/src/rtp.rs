@@ -2,7 +2,7 @@ use std::{
     fmt::Debug,
     net::UdpSocket,
     ops::{Deref, DerefMut},
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{Arc, Mutex, MutexGuard}, time::Duration,
 };
 
 use bytes::{BufMut, BytesMut};
@@ -243,7 +243,10 @@ impl<T: IntoBytes + Immutable + ?Sized> RtpSender<T> {
         packet.put_u32(self.seq_num);
         packet.put(data.as_ref().as_bytes());
 
-        self.sock.send(packet).unwrap();
+        while let Err(e) = self.sock.send(packet) {
+            log::error!("Error sending packet from {:?} -> {:?}: {}", self.sock.peer_addr(), self.sock.local_addr(), e);
+            std::thread::sleep(Duration::from_millis(500));
+        }
         log::trace!("sent seq: {}", self.seq_num);
         self.seq_num = self.seq_num.wrapping_add(1);
         self.scratch.clear();

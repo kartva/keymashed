@@ -23,18 +23,7 @@ use zerocopy::FromBytes;
 use simplelog::WriteLogger;
 
 fn main() -> std::io::Result<()> {
-    let log_file: Box<dyn Write + Send> = if BUFFER_LOGS {
-        Box::new(std::io::BufWriter::with_capacity(
-            65536, /* 64 KiB */
-            std::fs::File::create("send.log")?,
-        ))
-    } else {
-        Box::new(std::fs::File::create("send.log")?)
-    };
-
-    WriteLogger::init(LOG_LEVEL, simplelog::Config::default(), log_file).unwrap();
-
-    // audio::send_audio();
+    run_louder::init_logger(true);
     send_video();
 
     Ok(())
@@ -85,7 +74,6 @@ impl FrameCircularBuffer {
     pub fn push_frame(&mut self, frame: &[u8]) {
         if self.start_frame_num == (self.end_frame_num + 1) % VIDEO_FRAME_DELAY {
             log::error!("Frame buffer full; dropping frame");
-            eprint!("Frame buffer full; dropping frame");
             return;
         }
 

@@ -17,21 +17,7 @@ struct VideoPacket {
 }
 
 fn main() -> std::io::Result<()> {
-    let log_file: Box<dyn Write + Send> = if BUFFER_LOGS {
-        Box::new(std::io::BufWriter::with_capacity(
-            65536 /* 64 KiB */,
-            std::fs::File::create("recv.log")?
-        ))
-    } else {
-        Box::new(std::fs::File::create("recv.log")?)
-    };
-
-    WriteLogger::init(
-        LOG_LEVEL,
-        simplelog::Config::default(),
-        log_file,
-    )
-    .unwrap();
+    run_louder::init_logger(false);
 
     let (bpf_write_channel, bpf_receive_channel) = std::sync::mpsc::channel();
     std::thread::spawn(move || {

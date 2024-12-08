@@ -19,7 +19,7 @@ pub const VIDEO_DELAY: Duration = Duration::from_secs(2 * 60);
 pub const VIDEO_FRAME_DELAY: usize = (VIDEO_FPS_TARGET * VIDEO_DELAY.as_secs() as f64) as usize;
 
 pub const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
-pub const BUFFER_LOGS: bool = true;
+// pub const BUFFER_LOGS: bool = true;
 
 pub const PACKET_SEND_THRESHOLD: usize = 1500;
 
@@ -44,6 +44,10 @@ pub struct ControlMessage {
     pub quality: f64,
 }
 
+pub fn init_logger(_is_send: bool) {
+    simplelog::SimpleLogger::init(LOG_LEVEL, simplelog::Config::default()).unwrap();
+}
+
 pub fn udp_connect_retry<A>(addr: A) -> std::net::UdpSocket
 where
     A: std::net::ToSocketAddrs + std::fmt::Debug,
@@ -53,7 +57,6 @@ where
             break s;
         } else {
             log::error!("Failed to bind to {addr:?}; retrying in 2 second");
-            eprintln!("Failed to bind to {addr:?}; retrying in 2 seconds");
             std::thread::sleep(Duration::from_secs(2));
         }
     }
