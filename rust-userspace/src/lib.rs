@@ -4,11 +4,11 @@ use std::time::Duration;
 
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-pub mod bpf;
-pub mod wpm;
-pub mod rtp;
 pub mod audio;
+pub mod bpf;
+pub mod rtp;
 pub mod video;
+pub mod wpm;
 
 pub const VIDEO_WIDTH: u32 = 640;
 pub const VIDEO_HEIGHT: u32 = 480;
@@ -27,19 +27,12 @@ pub const AUDIO_SEND_ADDR: &str = "127.0.0.1:44406";
 pub const AUDIO_DEST_ADDR: &str = "127.0.0.1:44403";
 
 pub const RECV_HACKERS_IP: &str = "100.100.1.141";
+pub const SENDER_FFFF_IP: &str = "100.100.1.174";
 
-
-lazy_static::lazy_static! {
-    /// The video receiver sends control information to this address.
-    pub static ref CONTROL_SEND_ADDR: &'static str = std::env::var("CONTROL_SEND_ADDR").unwrap_or_else(|_| "100.100.1.174:44601".to_string()).leak();
-    /// The video sender receives control information from this address.
-    /// The video receiver hosts the control server on this address.
-    pub static ref CONTROL_RECV_ADDR: &'static str = std::env::var("CONTROL_RECV_ADDR").unwrap_or_else(|_| "100.100.1.141:51902".to_string()).leak();
-    /// The video sender sends video data to this address.
-    pub static ref VIDEO_SEND_ADDR: &'static str = std::env::var("VIDEO_SEND_ADDR").unwrap_or_else(|_| "100.100.1.174:44001".to_string()).leak();
-    /// The video receiver receives video data from this address.
-    pub static ref VIDEO_DEST_ADDR: &'static str = std::env::var("VIDEO_DEST_ADDR").unwrap_or_else(|_| "100.100.1.141:44002".to_string()).leak();
-}
+pub const RECV_VIDEO_PORT: u16 = 44002;
+pub const SEND_VIDEO_PORT: u16 = 44001;
+pub const RECV_CONTROL_PORT: u16 = 51902;
+pub const SEND_CONTROL_PORT: u16 = 44601;
 
 pub const PIXEL_WIDTH: usize = 2;
 pub const PACKET_X_DIM: usize = 16;
@@ -51,13 +44,16 @@ pub struct ControlMessage {
     pub quality: f64,
 }
 
-pub fn udp_connect_retry(addr: &str) -> std::net::UdpSocket {
+pub fn udp_connect_retry<A>(addr: A) -> std::net::UdpSocket
+where
+    A: std::net::ToSocketAddrs + std::fmt::Debug,
+{
     loop {
-        if let Ok(s) = std::net::UdpSocket::bind(*VIDEO_SEND_ADDR) {
-            break s
+        if let Ok(s) = std::net::UdpSocket::bind(&addr) {
+            break s;
         } else {
-            log::error!("Failed to bind to {addr}; retrying in 2 second");
-            eprintln!("Failed to bind to {addr}; retrying in 2 seconds");
+            log::error!("Failed to bind to {addr:?}; retrying in 2 second");
+            eprintln!("Failed to bind to {addr:?}; retrying in 2 seconds");
             std::thread::sleep(Duration::from_secs(2));
         }
     }

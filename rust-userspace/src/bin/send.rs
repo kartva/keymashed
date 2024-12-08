@@ -8,6 +8,7 @@ use run_louder::*;
 use bytes::BufMut;
 use rtp::RtpSender;
 use std::convert::Infallible;
+use std::net::Ipv4Addr;
 use std::net::UdpSocket;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -153,21 +154,13 @@ pub fn send_video() {
         })
         .unwrap();
 
-    let sock = udp_connect_retry(*VIDEO_SEND_ADDR);
+    let sock = udp_connect_retry((Ipv4Addr::UNSPECIFIED, SEND_VIDEO_PORT));
+    sock.connect((RECV_HACKERS_IP, RECV_VIDEO_PORT)).unwrap();
 
-    sock.connect(*VIDEO_DEST_ADDR).unwrap();
-
-    log::info!(
-        "Attempting to connect to control server at {}",
-        *CONTROL_SEND_ADDR
-    );
-
+    let receiver_communication_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, SEND_CONTROL_PORT));
+    receiver_communication_socket.connect((RECV_HACKERS_IP, RECV_CONTROL_PORT)).unwrap();
+    
     let quality = Arc::new(RwLock::new(0.3));
-
-    // Connect timeout due to packet loss conditions
-    let receiver_communication_socket = udp_connect_retry(*CONTROL_SEND_ADDR);
-    receiver_communication_socket.connect(*CONTROL_RECV_ADDR).unwrap();
-
     let cloned_quality = quality.clone();
     std::thread::spawn(|| {
         receive_control(cloned_quality, receiver_communication_socket);

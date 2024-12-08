@@ -6,7 +6,7 @@ use bytes::Buf;
 use sdl2::{self, pixels::{Color, PixelFormatEnum}, rect::Rect};
 use video::{decode_quantized_macroblock, dequantize_macroblock, MutableYUVFrame};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-use std::{io::Write, net::UdpSocket, thread::sleep, time::Duration};
+use std::{io::Write, net::{Ipv4Addr, UdpSocket}, thread::sleep, time::Duration};
 
 use simplelog::WriteLogger;
 
@@ -77,14 +77,12 @@ fn main() -> std::io::Result<()> {
     let texture_creator = renderer.texture_creator();
     let mut texture = texture_creator.create_texture_streaming(PixelFormatEnum::YUY2, VIDEO_WIDTH, VIDEO_HEIGHT).unwrap();
 
-    let video_recieving_socket = udp_connect_retry(*VIDEO_DEST_ADDR);
+    let video_recieving_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_VIDEO_PORT));
+    video_recieving_socket.connect((SENDER_FFFF_IP, SEND_VIDEO_PORT)).unwrap();
     let video_reciever = rtp::RtpReciever::<VideoPacket, 8192>::new(video_recieving_socket);
 
-    println!("Waiting for sender to connect to control server at {}", *CONTROL_RECV_ADDR);
-    log::info!("Waiting for sender to connect to control server at {}", *CONTROL_RECV_ADDR);
-
-    let sender_communication_socket = udp_connect_retry(*CONTROL_RECV_ADDR);
-    sender_communication_socket.connect(*CONTROL_SEND_ADDR).unwrap();
+    let sender_communication_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_CONTROL_PORT));
+    sender_communication_socket.connect((SENDER_FFFF_IP, SEND_CONTROL_PORT)).unwrap();
 
     log::info!("Sender connected to control server from {:?}", sender_communication_socket.local_addr().unwrap());
 
