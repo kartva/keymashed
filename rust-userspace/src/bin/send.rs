@@ -136,10 +136,10 @@ pub fn send_video() {
         .unwrap();
 
     let sock = udp_connect_retry((Ipv4Addr::UNSPECIFIED, SEND_VIDEO_PORT));
-    sock.connect((RECV_HACKERS_IP, RECV_VIDEO_PORT)).unwrap();
+    sock.connect((RECV_IP, RECV_VIDEO_PORT)).unwrap();
 
     let receiver_communication_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, SEND_CONTROL_PORT));
-    receiver_communication_socket.connect((RECV_HACKERS_IP, RECV_CONTROL_PORT)).unwrap();
+    receiver_communication_socket.connect((RECV_IP, RECV_CONTROL_PORT)).unwrap();
     
     let quality = Arc::new(RwLock::new(0.3));
     let cloned_quality = quality.clone();

@@ -66,11 +66,11 @@ fn main() -> std::io::Result<()> {
     let mut texture = texture_creator.create_texture_streaming(PixelFormatEnum::YUY2, VIDEO_WIDTH, VIDEO_HEIGHT).unwrap();
 
     let video_recieving_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_VIDEO_PORT));
-    video_recieving_socket.connect((SENDER_FFFF_IP, SEND_VIDEO_PORT)).unwrap();
+    video_recieving_socket.connect((SEND_IP, SEND_VIDEO_PORT)).unwrap();
     let video_reciever = rtp::RtpReciever::<VideoPacket, 8192>::new(video_recieving_socket);
 
     let sender_communication_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_CONTROL_PORT));
-    sender_communication_socket.connect((SENDER_FFFF_IP, SEND_CONTROL_PORT)).unwrap();
+    sender_communication_socket.connect((SEND_IP, SEND_CONTROL_PORT)).unwrap();
 
     log::info!("Sender connected to control server from {:?}", sender_communication_socket.local_addr().unwrap());
 

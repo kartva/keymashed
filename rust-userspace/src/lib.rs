@@ -23,15 +23,22 @@ pub const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Warn;
 
 pub const PACKET_SEND_THRESHOLD: usize = 1500;
 
-pub const AUDIO_SEND_ADDR: &str = "127.0.0.1:44406";
-pub const AUDIO_DEST_ADDR: &str = "127.0.0.1:44403";
+/// IP address of the machine running the `recv` binary.
+pub const RECV_IP: &str = "127.0.0.1";
+/// IP address of the machine running the `send` binary.
+pub const SEND_IP: &str = "127.0.0.1";
 
-pub const RECV_HACKERS_IP: &str = "100.100.1.141";
-pub const SENDER_FFFF_IP: &str = "100.100.1.174";
-
+/// Port on recv for audio data.
+pub const RECV_AUDIO_PORT: u16 = 44403;
+/// Port on send for audio data.
+pub const SEND_AUDIO_PORT: u16 = 44406;
+/// Port on recv for video data.
 pub const RECV_VIDEO_PORT: u16 = 44002;
+/// Port on send for video data.
 pub const SEND_VIDEO_PORT: u16 = 44001;
+/// Port on recv for control messages.
 pub const RECV_CONTROL_PORT: u16 = 51902;
+/// Port on send for control messages.
 pub const SEND_CONTROL_PORT: u16 = 44601;
 
 pub const PIXEL_WIDTH: usize = 2;

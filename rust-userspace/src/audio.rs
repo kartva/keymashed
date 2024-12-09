@@ -1,9 +1,7 @@
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use std::time::Duration;
-use std::net::{Ipv4Addr, UdpSocket};
-use crate::{rtp, udp_connect_retry};
-
-use crate::{AUDIO_DEST_ADDR, AUDIO_SEND_ADDR};
+use std::net::Ipv4Addr;
+use crate::{rtp, udp_connect_retry, RECV_AUDIO_PORT, RECV_IP, SEND_IP, SEND_AUDIO_PORT};
 
 pub const AUDIO_SAMPLE_COUNT: usize = 1024;
 pub const AUDIO_FREQUENCY: i32 = 44100;
@@ -49,8 +47,9 @@ impl AudioCallback for AudioCallbackData {
 /// Ensure that the frequency, sample count and bit depth of the sender and reciever match.
 
 pub fn play_audio(audio_subsystem: &sdl2::AudioSubsystem) -> AudioDevice<AudioCallbackData> {
-    log::info!("Binding to audio destination address: {}", AUDIO_DEST_ADDR);
-    let sock = udp_connect_retry(AUDIO_DEST_ADDR);
+    let sock = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_AUDIO_PORT));
+    sock.connect((SEND_IP, SEND_AUDIO_PORT)).unwrap();
+
     let recv: rtp::RtpReciever<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH> = rtp::RtpReciever::new(sock);
 
     let desired_spec = AudioSpecDesired {
@@ -79,49 +78,26 @@ pub fn play_audio(audio_subsystem: &sdl2::AudioSubsystem) -> AudioDevice<AudioCa
     device.resume();
     device
 }
-struct SquareWave {
-    phase_inc: f32,
-    phase: f32,
-    volume: f32,
-}
-
-impl SquareWave {
-    fn new(freq: f32) -> Self {
-        SquareWave {
-            phase_inc: 440.0 / freq,
-            phase: 0.0,
-            volume: 0.25,
-        }
-    }
-
-    fn step(&mut self, buf: &mut [f32; AUDIO_SAMPLE_COUNT]) {
-        // Generate a square wave
-        for x in buf.iter_mut() {
-            *x = if self.phase <= 0.5 {
-                self.volume
-            } else {
-                -self.volume
-            };
-            self.phase = (self.phase + self.phase_inc) % 1.0;
-        }
-    }
-}
 
 /// Start sending audio over a UDP stream. Audio will be sent indefinitely.
 pub fn send_audio() -> ! {
-    log::info!("Binding to audio send address: {}", AUDIO_SEND_ADDR);
-    let sock = udp_connect_retry("0.0.0.0:44406");
-    log::info!("Connecting to audio destination address: {}", AUDIO_DEST_ADDR);
-    sock.connect(AUDIO_DEST_ADDR).unwrap();
+    let sock = udp_connect_retry((Ipv4Addr::UNSPECIFIED, SEND_AUDIO_PORT));
+    sock.connect((RECV_IP, RECV_AUDIO_PORT)).unwrap();
     let mut sender = rtp::RtpSender::new(sock);
+    
+    let mut time = 0.0;
+    let mut audio_wav_reader = std::iter::from_fn(move || {
+        time += 1.0 / AUDIO_FREQUENCY as f32;
+        Some(0.5 * (2.0 * std::f32::consts::PI * 440.0 * time).sin())
+    });
 
-    let mut square_wave = SquareWave::new(AUDIO_FREQUENCY as _);
     let mut bytes = [0.0; AUDIO_SAMPLE_COUNT];
-
     log::info!("Starting to send audio!");
 
     loop {
-        square_wave.step(&mut bytes);
+        for idx in 0..AUDIO_SAMPLE_COUNT {
+            bytes[idx] = audio_wav_reader.next().unwrap();
+        }
         sender.send(bytes);
         std::thread::sleep(Duration::from_millis(
             (1000 * AUDIO_SAMPLE_COUNT as u64) / (AUDIO_FREQUENCY as u64),
