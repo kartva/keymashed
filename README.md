@@ -4,7 +4,7 @@ _What if... you could motivate it. Make the internet itself flow a lil' quicker.
 
 ## Keymashed
 
-An interactive installation at [Purdue Hacker's BURST](https://burst.purduehackers.com/). Since making the internet faster is a hard research problem, `keymashed` instead settles for slowing down the internet and then easing up on the impairment based on how many keys you mash.
+An interactive installation at [Purdue Hacker's BURST](https://burst.purduehackers.com/). Since making the internet faster is a hard research problem, `keymashed` instead settles for slowing down the internet and then easing up on the impairment based on how many keys you mash. Observe the effects of your encouragement through a bad video protocol made for your enjoyment. Mash a variety of keys for best effect.
 
 https://github.com/user-attachments/assets/f13cbadf-bcb7-433d-a5de-5e4c0cf470ff
 
