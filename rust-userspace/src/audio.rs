@@ -9,7 +9,7 @@ pub const AUDIO_BUFFER_LENGTH: usize = 1024;
 
 pub struct AudioCallbackData {
     last: [f32; AUDIO_SAMPLE_COUNT],
-    recv: rtp::RtpReciever<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH>,
+    recv: rtp::RtpRecieverSized<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH>,
 }
 
 impl AudioCallback for AudioCallbackData {
@@ -32,7 +32,7 @@ impl AudioCallback for AudioCallbackData {
         let received_packet = locked_reciever.consume_earliest_packet();
 
         if let Some(packet) = received_packet.get_data() {
-            log::info!("Playing packet with seq: {}", packet.sequence_number);
+            log::info!("Playing packet with seq: {:?}", packet.header);
 
             out.copy_from_slice(&packet.data);
 
@@ -50,7 +50,7 @@ pub fn play_audio(audio_subsystem: &sdl2::AudioSubsystem) -> AudioDevice<AudioCa
     let sock = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_AUDIO_PORT));
     sock.connect((SEND_IP, SEND_AUDIO_PORT)).unwrap();
 
-    let recv: rtp::RtpReciever<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH> = rtp::RtpReciever::new(sock);
+    let recv: rtp::RtpRecieverSized<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH> = rtp::RtpReciever::new(sock);
 
     let desired_spec = AudioSpecDesired {
         freq: Some(AUDIO_FREQUENCY),
@@ -83,7 +83,7 @@ pub fn play_audio(audio_subsystem: &sdl2::AudioSubsystem) -> AudioDevice<AudioCa
 pub fn send_audio() -> ! {
     let sock = udp_connect_retry((Ipv4Addr::UNSPECIFIED, SEND_AUDIO_PORT));
     sock.connect((RECV_IP, RECV_AUDIO_PORT)).unwrap();
-    let mut sender = rtp::RtpSender::new(sock);
+    let mut sender: rtp::RtpSizedPayloadSender<[f32; AUDIO_SAMPLE_COUNT]> = rtp::RtpSizedPayloadSender::new_with_buf_size(sock);
     
     let mut time = 0.0;
     let mut audio_wav_reader = std::iter::from_fn(move || {
@@ -91,14 +91,14 @@ pub fn send_audio() -> ! {
         Some(0.5 * (2.0 * std::f32::consts::PI * 440.0 * time).sin())
     });
 
-    let mut bytes = [0.0; AUDIO_SAMPLE_COUNT];
     log::info!("Starting to send audio!");
 
     loop {
-        for idx in 0..AUDIO_SAMPLE_COUNT {
-            bytes[idx] = audio_wav_reader.next().unwrap();
-        }
-        sender.send(bytes);
+        sender.send(|bytes: &mut [f32; AUDIO_SAMPLE_COUNT]| {
+            for idx in 0..AUDIO_SAMPLE_COUNT {
+                bytes[idx] = audio_wav_reader.next().unwrap();
+            }
+        });
         std::thread::sleep(Duration::from_millis(
             (1000 * AUDIO_SAMPLE_COUNT as u64) / (AUDIO_FREQUENCY as u64),
         ));
