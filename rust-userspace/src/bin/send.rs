@@ -63,7 +63,8 @@ impl DummyWebcam {
 
         for y in 0..VIDEO_HEIGHT as usize {
             for x in 0..VIDEO_WIDTH as usize {
-                let pixel = &mut frame[(y * VIDEO_WIDTH as usize + x) * PIXEL_WIDTH as usize..(y * VIDEO_WIDTH as usize + x) * PIXEL_WIDTH as usize + 2];
+                let pixel = &mut frame[(y * VIDEO_WIDTH as usize + x) * PIXEL_WIDTH as usize
+                    ..(y * VIDEO_WIDTH as usize + x) * PIXEL_WIDTH as usize + 2];
                 pixel[0] = ((x + (self.frame_count as usize)) % u8::MAX as usize) as u8;
                 pixel[1] = ((y + (2 * self.frame_count as usize)) % u8::MAX as usize) as u8;
             }
@@ -72,7 +73,6 @@ impl DummyWebcam {
         Ok(self.frame.as_slice())
     }
 }
-
 
 const FRAME_CIRCULAR_BUFFER_SIZE: usize =
     VIDEO_FRAME_DELAY * VIDEO_HEIGHT as usize * VIDEO_WIDTH as usize * 2;
@@ -125,7 +125,9 @@ pub fn send_video() {
 
     let mut camera = rscam::Camera::new("/dev/video0").unwrap();
 
-    dbg!(camera.intervals(b"YUYV", (VIDEO_WIDTH as _, VIDEO_HEIGHT as _)).expect("interval information is available"));
+    dbg!(camera
+        .intervals(b"YUYV", (VIDEO_WIDTH as _, VIDEO_HEIGHT as _))
+        .expect("interval information is available"));
 
     camera
         .start(&rscam::Config {
@@ -139,9 +141,12 @@ pub fn send_video() {
     let sock = udp_connect_retry((Ipv4Addr::UNSPECIFIED, SEND_VIDEO_PORT));
     sock.connect((RECV_IP, RECV_VIDEO_PORT)).unwrap();
 
-    let receiver_communication_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, SEND_CONTROL_PORT));
-    receiver_communication_socket.connect((RECV_IP, RECV_CONTROL_PORT)).unwrap();
-    
+    let receiver_communication_socket =
+        udp_connect_retry((Ipv4Addr::UNSPECIFIED, SEND_CONTROL_PORT));
+    receiver_communication_socket
+        .connect((RECV_IP, RECV_CONTROL_PORT))
+        .unwrap();
+
     let quality = Arc::new(RwLock::new(0.3));
     let cloned_quality = quality.clone();
     std::thread::spawn(|| {
