@@ -14,3 +14,9 @@ Keymashed consists of the following components:
 - an RTP-like protocol to showcase the effects of packet loss.
 
 Consult the READMEs in the directories for more details on each component.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/27412e69-7cbc-4a01-9383-3a5e2ed242dd" style="height: 40%; width: 40%;" />
+  <br>
+   Poster design by Rebecca Pine and pixel art by Jadden Picardal.
+</p>
