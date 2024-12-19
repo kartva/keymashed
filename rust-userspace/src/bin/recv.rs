@@ -67,7 +67,7 @@ fn main() -> std::io::Result<()> {
 
     let video_recieving_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_VIDEO_PORT));
     video_recieving_socket.connect((SEND_IP, SEND_VIDEO_PORT)).unwrap();
-    let video_reciever = rtp::RtpSizedPayloadReciever::<VideoPacket, 8192>::new(video_recieving_socket);
+    let video_reciever = rtp::RtpSlicePayloadReciever::<u8, PACKET_PAYLOAD_SIZE_THRESHOLD, 8192>::new(video_recieving_socket);
 
     let sender_communication_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_CONTROL_PORT));
     sender_communication_socket.connect((SEND_IP, SEND_CONTROL_PORT)).unwrap();
@@ -122,32 +122,32 @@ fn main() -> std::io::Result<()> {
         renderer.set_draw_color(wpm::wpm_to_sdl_color(wpm, Color::GREEN));
         renderer.clear();
 
-        texture.with_lock(None, |buffer: &mut [u8], _pitch: usize| {
-            log::info!("Playing frame {}", frame_count);
-            
-            let mut packet_index = 0usize;
+        texture.with_lock(None, |buffer: &mut [u8], _pitch: usize| {            
             let mut locked_video_reciever = video_reciever.lock_reciever();
 
             // If the circular buffer hasn't seen enough future packets, wait for more to arrive
             // Handles the case: sender is falling behind in sending packets.
-            while locked_video_reciever.early_latest_span() < 5 {
-                log::debug!("Sleeping and waiting for more packets to arrive. Early-latest span {}", locked_video_reciever.early_latest_span());
+            if locked_video_reciever.early_latest_span() < 20 {
+                log::info!("Sleeping and waiting for more packets to arrive. Early-latest span {}", locked_video_reciever.early_latest_span());
                 return;
             }
 
-            const BLOCK_WRITTEN_WIDTH: usize = (VIDEO_WIDTH as usize) / PACKET_X_DIM;
-            const BLOCK_WRITTEN_HEIGHT: usize = (VIDEO_HEIGHT as usize) / PACKET_Y_DIM;
+            log::info!("Playing frame {}", frame_count);
+
+            const BLOCK_WRITTEN_WIDTH: usize = (VIDEO_WIDTH as usize) / MACROBLOCK_X_DIM;
+            const BLOCK_WRITTEN_HEIGHT: usize = (VIDEO_HEIGHT as usize) / MACROBLOCK_Y_DIM;
 
             let mut block_written = [[false; BLOCK_WRITTEN_WIDTH]; BLOCK_WRITTEN_HEIGHT];
-
-            while (packet_index as u32) < (VIDEO_HEIGHT * VIDEO_WIDTH * PIXEL_WIDTH as u32 / PACKET_SIZE as u32) {
+            
+            let mut packet_index = 0usize;
+            while (packet_index as u32) < (VIDEO_HEIGHT * VIDEO_WIDTH * PIXEL_WIDTH as u32 / MACROBLOCK_BYTE_SIZE as u32) {
                 // if we have a packet with a higher frame number, earlier packets have been dropped from the circular buffer
                 // so redraw the current frame with more up-to-date packets (and skip ahead to a later frame)
                 // Handles the case: receiver is falling behind in consuming packets.
                 log::trace!("Playing Frame {frame_count} packet index: {}", packet_index);
                 
                 if let Some(p) = locked_video_reciever.peek_earliest_packet() {
-                    let mut cursor = &p.data.data[..];
+                    let mut cursor = &p.data[..];
                     let packet_frame_count = cursor.get_u32();
                     if packet_frame_count > frame_count {
                         log::warn!("Skipping ahead to frame {}", packet_frame_count);
@@ -159,7 +159,8 @@ fn main() -> std::io::Result<()> {
                 let packet = locked_video_reciever.consume_earliest_packet();
                 if let Some(packet) = packet.get_data() {
                     // copy the packet data into the buffer
-                    let mut cursor = &packet.data.data[..];
+                    let mut cursor = &packet.data[..];
+                    log::trace!("Packet slice has length {}", cursor.len());
 
                     let cursor_start_len = cursor.len();
                     let _packet_frame_count = cursor.get_u32();
@@ -167,23 +168,28 @@ fn main() -> std::io::Result<()> {
                         let cursor_position = cursor_start_len - cursor.remaining();
                         let x = cursor.get_u16() as usize;
                         let y = cursor.get_u16() as usize;
-                        let quality = cursor.get_f64();
-
+                        
                         if (x == u16::MAX as usize) && (y == u16::MAX as usize) {
                             break;
                         }
+                        let quality = cursor.get_f64();
 
-                        block_written[y / PACKET_Y_DIM][x / PACKET_X_DIM] = true;
+                        block_written[y / MACROBLOCK_Y_DIM][x / MACROBLOCK_X_DIM] = true;
 
-                        log::trace!("Receiving MacroblockWithPos at ({frame_count}, {x}, {y}) at cursor position {cursor_position}");
+                        // log::trace!("Receiving MacroblockWithPos at ({frame_count}, {x}, {y}) at cursor position {cursor_position}");
 
                         let decoded_quantized_macroblock;
                         (decoded_quantized_macroblock, cursor) = decode_quantized_macroblock(&cursor);
                         let macroblock = dequantize_macroblock(&decoded_quantized_macroblock, quality);
                         macroblock.copy_to_yuv422_frame(MutableYUVFrame::new(VIDEO_WIDTH as usize, VIDEO_HEIGHT as usize, buffer), x, y);
+                        packet_index += 1;
                     }
                 }
-                packet_index += 1;
+                else {
+                    // TODO: fix this hack
+                    // roughly 40 macroblocks per packet are packed in
+                    packet_index += 40;
+                }
             }
 
             frame_count += 1;
@@ -193,6 +199,7 @@ fn main() -> std::io::Result<()> {
         renderer.present();
 
         let elapsed = start_time.elapsed();
+        log::info!("Recieved and drew frame {} in {} ms", frame_count, elapsed.as_millis());
         // delay to hit target FPS
         let target_latency = Duration::from_secs_f64(1.0 / VIDEO_FPS_TARGET);
         if elapsed < target_latency {

@@ -433,7 +433,6 @@ pub fn encode_quantized_macroblock(quantized_macroblock: &QuantizedMacroblock, b
 
 /// Decodes a quantized block from the stream, returning the block and a pointer to the remaining data.
 fn decode_quantized_block(data: &[u8]) -> ([[i8; 8]; 8], &[u8]) {
-    log::trace!("Decode quantized block: given data slice of length {}", data.len());
     let mut block = [[0; 8]; 8];
     let quantized_block = QuantizedZigZagBlock::new_ref_mut(&mut block);
 
@@ -497,8 +496,8 @@ mod test {
             v: [[128; 8]; 8],
         };
 
-        let quantized_block = quantize_macroblock(&block);
-        let dequantized_block = dequantize_macroblock(&quantized_block);
+        let quantized_block = quantize_macroblock(&block, 0.03);
+        let dequantized_block = dequantize_macroblock(&quantized_block, 0.03);
 
         assert_eq!(block.y0, dequantized_block.y0);
         assert_eq!(block.y1, dequantized_block.y1);
@@ -575,14 +574,14 @@ mod test {
                 [131, 131, 130, 130, 130, 130, 131, 130],
             ],
         };
-        let quantized_macroblock = quantize_macroblock(&macroblock);
+        let quantized_macroblock = quantize_macroblock(&macroblock, 0.3);
         log::info!("{:?}", quantized_macroblock);
         let mut rle_buf = Vec::new();
         encode_quantized_macroblock(&quantized_macroblock, &mut rle_buf);
         let (decoded_quantized_macroblock, remaining) = decode_quantized_macroblock(&rle_buf);
         assert!(remaining.is_empty());
         assert_eq!(quantized_macroblock, decoded_quantized_macroblock);
-        let decoded_macroblock = dequantize_macroblock(&decoded_quantized_macroblock);
+        let decoded_macroblock = dequantize_macroblock(&decoded_quantized_macroblock, 0.3);
 
         log::info!("{:?}", decoded_macroblock);
 

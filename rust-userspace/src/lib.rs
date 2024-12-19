@@ -1,7 +1,8 @@
 #![feature(generic_const_exprs)]
 
-use std::{net::UdpSocket, time::Duration};
+use std::{io::Write, net::UdpSocket, time::Duration};
 
+use simplelog::WriteLogger;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub mod audio;
@@ -12,16 +13,17 @@ pub mod wpm;
 
 pub const VIDEO_WIDTH: u32 = 640;
 pub const VIDEO_HEIGHT: u32 = 480;
-pub const VIDEO_FPS_TARGET: f64 = 20.0;
+pub const VIDEO_FPS_TARGET: f64 = 30.0;
 
-pub const VIDEO_DELAY: Duration = Duration::from_secs(30);
+pub const VIDEO_DELAY: Duration = Duration::from_secs(1);
 // calculate frames per second, multiply by number of seconds to delay
 pub const VIDEO_FRAME_DELAY: usize = (VIDEO_FPS_TARGET * VIDEO_DELAY.as_secs() as f64) as usize;
 
 pub const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Warn;
-// pub const BUFFER_LOGS: bool = true;
+pub const BUFFER_LOGS: bool = false;
 
-pub const PACKET_SEND_THRESHOLD: usize = 1500;
+/// Maximum size of packet payloads. (Tries to correspond to Ethernet MTU)
+pub const PACKET_PAYLOAD_SIZE_THRESHOLD: usize = 1400;
 
 /// IP address of the machine running the `recv` binary.
 pub const RECV_IP: &str = "127.0.0.1";
@@ -42,9 +44,9 @@ pub const RECV_CONTROL_PORT: u16 = 51902;
 pub const SEND_CONTROL_PORT: u16 = 44601;
 
 pub const PIXEL_WIDTH: usize = 2;
-pub const PACKET_X_DIM: usize = 16;
-pub const PACKET_Y_DIM: usize = 16;
-pub const PACKET_SIZE: usize = PACKET_X_DIM * PACKET_Y_DIM * PIXEL_WIDTH;
+pub const MACROBLOCK_X_DIM: usize = 16;
+pub const MACROBLOCK_Y_DIM: usize = 16;
+pub const MACROBLOCK_BYTE_SIZE: usize = MACROBLOCK_X_DIM * MACROBLOCK_Y_DIM * PIXEL_WIDTH;
 
 #[derive(FromBytes, IntoBytes, KnownLayout, Immutable, Debug, Clone, Copy)]
 pub struct ControlMessage {
@@ -52,7 +54,22 @@ pub struct ControlMessage {
 }
 
 pub fn init_logger(_is_send: bool) {
-    simplelog::SimpleLogger::init(LOG_LEVEL, simplelog::Config::default()).unwrap();
+    let log_file_name = if _is_send { "send.log" } else { "recv.log" };
+
+    let log_file: Box<dyn Write + Send> = if BUFFER_LOGS {
+        Box::new(std::io::BufWriter::with_capacity(
+            65536 /* 64 KiB */,
+            std::fs::File::create(log_file_name).unwrap()
+        ))
+    } else {
+        Box::new(std::fs::File::create(log_file_name).unwrap())
+    };
+    WriteLogger::init(
+        LOG_LEVEL,
+        simplelog::Config::default(),
+        log_file,
+    )
+    .unwrap();
 }
 
 pub fn udp_send_retry(sock: &UdpSocket, buf: &[u8]) {

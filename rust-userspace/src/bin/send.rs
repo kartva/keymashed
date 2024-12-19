@@ -11,6 +11,7 @@ use rtp::RtpSender;
 use std::convert::Infallible;
 use std::net::Ipv4Addr;
 use std::net::UdpSocket;
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::RwLock;
@@ -123,11 +124,11 @@ impl FrameCircularBuffer {
 pub fn send_video() {
     log::info!("Starting camera!");
 
-    let mut camera = rscam::Camera::new("/dev/video0").unwrap();
+    let mut camera = rscam::Camera::new("/dev/video1").unwrap();
 
-    dbg!(camera
-        .intervals(b"YUYV", (VIDEO_WIDTH as _, VIDEO_HEIGHT as _))
-        .expect("interval information is available"));
+    // dbg!(camera
+    //     .intervals(b"YUYV", (VIDEO_WIDTH as _, VIDEO_HEIGHT as _))
+    //     .expect("interval information is available"));
 
     camera
         .start(&rscam::Config {
@@ -153,7 +154,7 @@ pub fn send_video() {
         receive_control(cloned_quality, receiver_communication_socket);
     });
 
-    let mut sender: RtpSlicePayloadSender<u8, PACKET_SEND_THRESHOLD> = rtp::RtpSender::new(sock);
+    let mut sender: RtpSlicePayloadSender<u8, PACKET_PAYLOAD_SIZE_THRESHOLD> = rtp::RtpSender::new(sock);
     let sender = Arc::new(Mutex::new(&mut sender));
 
     let mut frame_delay_buffer = FrameCircularBuffer::new();
@@ -167,6 +168,8 @@ pub fn send_video() {
     drop(dummy_camera);
 
     loop {
+        let start_time = std::time::Instant::now();
+
         let frame = camera.capture().unwrap();
         let frame: &[u8] = frame.as_ref();
         frame_delay_buffer.push_frame(frame);
@@ -179,11 +182,10 @@ pub fn send_video() {
         assert!(frame.len() % (VIDEO_WIDTH * PIXEL_WIDTH as u32) as usize == 0);
         assert!(frame.len() / (VIDEO_WIDTH as usize * PIXEL_WIDTH) == VIDEO_HEIGHT as usize);
 
-        let start_time = std::time::Instant::now();
 
         let frame = YUVFrame::new(VIDEO_WIDTH as usize, VIDEO_HEIGHT as usize, frame);
 
-        fn accumulate_packets(
+        fn process_block(
             quality: Arc<RwLock<f64>>,
             frame: &YUVFrame<'_>,
             frame_count: u32,
@@ -191,11 +193,10 @@ pub fn send_video() {
             y: usize,
             x_end: usize,
             y_end: usize,
-            sender: Arc<Mutex<&mut RtpSlicePayloadSender<u8, PACKET_SEND_THRESHOLD>>>,
+            sender: Arc<Mutex<&mut RtpSlicePayloadSender<u8, PACKET_PAYLOAD_SIZE_THRESHOLD>>>,
+            packet_buf: Arc<Mutex<Vec<u8>>>,
         ) {
-            let mut packet_buf = Vec::with_capacity(PACKET_SEND_THRESHOLD);
-            packet_buf.put_u32(frame_count);
-            let mut current_macroblock_buf = Vec::with_capacity(PACKET_SEND_THRESHOLD);
+            let mut current_macroblock_buf = Vec::with_capacity(PACKET_PAYLOAD_SIZE_THRESHOLD);
 
             for MacroblockWithPosition { x, y, block } in
                 YUVFrameMacroblockIterator::new_with_bounds(frame, x, y, x_end, y_end)
@@ -213,40 +214,42 @@ pub fn send_video() {
                 current_macroblock_buf.put_f64(quality);
                 encode_quantized_macroblock(&quantized_macroblock, &mut current_macroblock_buf);
 
-                if packet_buf.len() + current_macroblock_buf.len() + 4 >= PACKET_SEND_THRESHOLD {
+                let mut packet_buf = packet_buf.lock().unwrap();
+                if packet_buf.len() + current_macroblock_buf.len() + 2 * size_of::<u16>() >= PACKET_PAYLOAD_SIZE_THRESHOLD {
                     // send the packet and start a new one
                     packet_buf.put_u16(u16::MAX);
                     packet_buf.put_u16(u16::MAX);
-                    packet_buf.put_f64(0.0);
-                    sender.lock().unwrap().send(|mem| {
-                        mem.copy_from_slice(&packet_buf);
+
+                    sender.lock().unwrap().send_bytes(|mem| {
+                        mem[..packet_buf.len()].copy_from_slice(&packet_buf);
+                        packet_buf.len()
                     });
                     packet_buf.clear();
                     packet_buf.put_u32(frame_count);
                 }
 
                 // The macroblock consists of x, y, and the encoded macroblock
-                log::trace!(
-                    "Storing macroblock at ({}, {}, {}) at cursor position {}",
-                    frame_count,
-                    x,
-                    y,
-                    packet_buf.len()
-                );
+                // log::trace!(
+                //     "Storing macroblock at ({}, {}, {}) at cursor position {}",
+                //     frame_count,
+                //     x,
+                //     y,
+                //     packet_buf.len()
+                // );
                 packet_buf.put_slice(&current_macroblock_buf);
             }
-
-            // send leftover packet
-            packet_buf.put_u16(u16::MAX);
-            packet_buf.put_u16(u16::MAX);
-            sender.lock().unwrap().send(|mem| {
-                mem.copy_from_slice(&packet_buf);
-            });
         }
 
         const PAR_PACKET_SPAN: usize = 16;
-        assert!(PAR_PACKET_SPAN % PACKET_X_DIM == 0);
-        assert!(PAR_PACKET_SPAN % PACKET_Y_DIM == 0);
+        assert!(PAR_PACKET_SPAN % MACROBLOCK_X_DIM == 0);
+        assert!(PAR_PACKET_SPAN % MACROBLOCK_Y_DIM == 0);
+
+        let mut packet_buf = Vec::with_capacity(PACKET_PAYLOAD_SIZE_THRESHOLD);
+        packet_buf.put_u32(frame_count);
+
+        let packet_buf = Arc::new(Mutex::new(packet_buf));
+
+        let start_seq = sender.lock().unwrap().seq_num();
 
         (0..VIDEO_WIDTH as u32)
             .step_by(PAR_PACKET_SPAN)
@@ -255,7 +258,7 @@ pub fn send_video() {
                 (0..VIDEO_HEIGHT as u32)
                     .step_by(PAR_PACKET_SPAN)
                     .for_each(|y| {
-                        accumulate_packets(
+                        process_block(
                             quality.clone(),
                             &frame,
                             frame_count,
@@ -264,13 +267,26 @@ pub fn send_video() {
                             x as usize + PAR_PACKET_SPAN,
                             y as usize + PAR_PACKET_SPAN,
                             sender.clone(),
+                            packet_buf.clone(),
                         );
                     });
             });
+        
+        // send leftover packet, if any
+        let mut packet_buf = packet_buf.lock().unwrap();
+        if packet_buf.len() > 4 {
+            packet_buf.put_u16(u16::MAX);
+            packet_buf.put_u16(u16::MAX);
 
-        log::info!("Sent frame {}", frame_count);
+            sender.lock().unwrap().send_bytes(|mem| {
+                mem[..packet_buf.len()].copy_from_slice(&packet_buf);
+                packet_buf.len()
+            });
+        }
 
         let elapsed = start_time.elapsed();
+        log::info!("Sent frame {} in seq {}-{} in {} ms", frame_count, start_seq, sender.lock().unwrap().seq_num(), elapsed.as_millis());
+
         // delay to hit target FPS
         let target_latency = Duration::from_secs_f64(1.0 / VIDEO_FPS_TARGET);
         if elapsed < target_latency {
