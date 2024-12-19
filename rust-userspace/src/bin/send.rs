@@ -186,7 +186,7 @@ pub fn send_video() {
             y: usize,
             x_end: usize,
             y_end: usize,
-            sender: Arc<Mutex<&mut RtpSender<[u8], PACKET_SEND_THRESHOLD>>>,
+            sender: Arc<Mutex<&mut RtpSlicePayloadSender<u8>>>,
         ) {
             let mut packet_buf = Vec::with_capacity(PACKET_SEND_THRESHOLD);
             packet_buf.put_u32(frame_count);
@@ -213,7 +213,9 @@ pub fn send_video() {
                     packet_buf.put_u16(u16::MAX);
                     packet_buf.put_u16(u16::MAX);
                     packet_buf.put_f64(0.0);
-                    sender.lock().unwrap().send(&packet_buf);
+                    sender.lock().unwrap().send(|mem| {
+                        mem.copy_from_slice(&packet_buf);
+                    });
                     packet_buf.clear();
                     packet_buf.put_u32(frame_count);
                 }
@@ -232,7 +234,9 @@ pub fn send_video() {
             // send leftover packet
             packet_buf.put_u16(u16::MAX);
             packet_buf.put_u16(u16::MAX);
-            sender.lock().unwrap().send(&packet_buf);
+            sender.lock().unwrap().send(|mem| {
+                mem.copy_from_slice(&packet_buf);
+            });
         }
 
         const PAR_PACKET_SPAN: usize = 16;

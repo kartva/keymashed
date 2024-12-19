@@ -9,7 +9,7 @@ pub const AUDIO_BUFFER_LENGTH: usize = 1024;
 
 pub struct AudioCallbackData {
     last: [f32; AUDIO_SAMPLE_COUNT],
-    recv: rtp::RtpRecieverSized<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH>,
+    recv: rtp::RtpSizedReciever<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH>,
 }
 
 impl AudioCallback for AudioCallbackData {
@@ -50,7 +50,7 @@ pub fn play_audio(audio_subsystem: &sdl2::AudioSubsystem) -> AudioDevice<AudioCa
     let sock = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_AUDIO_PORT));
     sock.connect((SEND_IP, SEND_AUDIO_PORT)).unwrap();
 
-    let recv: rtp::RtpRecieverSized<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH> = rtp::RtpReciever::new(sock);
+    let recv: rtp::RtpSizedReciever<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH> = rtp::RtpReciever::new(sock);
 
     let desired_spec = AudioSpecDesired {
         freq: Some(AUDIO_FREQUENCY),

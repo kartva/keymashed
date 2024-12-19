@@ -1,5 +1,20 @@
+//! An implementation for an RTP-like protocol. Has a strong emphasis on zero-copy ser/de of packets using [`zerocopy`] (because figuring it out was fun).
+//! 
+//! Nomenclature:
+//! - Payload: The type of the data that is being sent.
+//! - Packet: A packet of data that is sent over the network. It contains a header and the payload data.
+//! 
+//! Payloads are allowed to be unsized. However, since we maintain a buffer of packets, we must still know an upper-bound on the size of the payload.
+//! The `SLOT_SIZE` parameter in the types in this module represents this upper-bound. (Note that it is exclusive of packet metadata)
+//! 
+//! Because unsized types do not have a fixed alignment, the types in this module have a type parameter `AlignPayloadTo` that represents a type that has the correct alignment for the payload.
+//! - Slices of data `[T]` have alignment of `T` (`Slice` variants of the structs in this module encode this concept).
+//! - For `dyn Trait` objects, use the type that the dyn was derived from.
+//! 
+//! Read more about alignment in Rust [here](https://doc.rust-lang.org/reference/type-layout.html).
+
 use std::{
-    fmt::Debug, marker::PhantomData, net::UdpSocket, num::NonZero, ops::{Deref, DerefMut}, sync::{Arc, Mutex, MutexGuard}
+    fmt::Debug, marker::PhantomData, mem::offset_of, net::UdpSocket, num::NonZero, ops::{Deref, DerefMut}, sync::{Arc, Mutex, MutexGuard}
 };
 
 use zerocopy::{byteorder::network_endian::U32, FromBytes, Unaligned};
@@ -10,7 +25,6 @@ use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 pub struct PacketHeader {
     sequence_number: U32,
 }
-
 
 #[derive(Debug, TryFromBytes, IntoBytes, KnownLayout, Immutable)]
 #[repr(C)]
@@ -27,16 +41,21 @@ pub const fn size_of_packet<T: TryFromBytes + IntoBytes + KnownLayout + Immutabl
 }
 
 /// A buffer of bytes that is the size of a packet.
+/// 
 /// The buffer is aligned for a packet with a payload of `PayloadAlignTo`.
-/// The `PACKET_SLOT_SIZE` is the size of the packet slot in bytes. This size is inclusive of packet metadata.
-struct AlignedPacketBytes<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const PACKET_SLOT_SIZE: usize> {
+/// The `SLOT_SIZE` is the size of the packet slot in bytes. This size **is not inclusive** of packet metadata.
+struct AlignedPacketBytes<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const SLOT_SIZE: usize>
+where 
+    [(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized
+{
     _phantom: PhantomData<T>,
     _align: [Packet<AlignPayloadTo>; 0], // align to the alignment of the packet
     // TODO: statically assert that the alignment is correct
-    inner: [u8; PACKET_SLOT_SIZE],
+    inner: [u8; size_of_packet::<[u8; SLOT_SIZE]>()],
 }
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const PACKET_SLOT_SIZE: usize> Debug for AlignedPacketBytes<T, AlignPayloadTo, PACKET_SLOT_SIZE> {
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const SLOT_SIZE: usize> Debug for AlignedPacketBytes<T, AlignPayloadTo, SLOT_SIZE> where 
+[(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PacketBytes")
             .field("inner", &self.inner)
@@ -44,7 +63,8 @@ impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloa
     }
 }
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const PACKET_SLOT_SIZE: usize> Deref for AlignedPacketBytes<T, AlignPayloadTo, PACKET_SLOT_SIZE> {
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const SLOT_SIZE: usize> Deref for AlignedPacketBytes<T, AlignPayloadTo, SLOT_SIZE> where 
+[(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized{
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -52,22 +72,25 @@ impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloa
     }
 }
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const PACKET_SLOT_SIZE: usize> DerefMut for AlignedPacketBytes<T, AlignPayloadTo, PACKET_SLOT_SIZE> {
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const SLOT_SIZE: usize> DerefMut for AlignedPacketBytes<T, AlignPayloadTo, SLOT_SIZE>where 
+[(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
 /// A packet buffer slot. See [`RtpCircularBuffer`].
-/// The `PACKET_SLOT_SIZE` is the size of the packet slot in bytes. This size is inclusive of packet metadata.
-pub struct MaybeInitPacket<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const PACKET_SLOT_SIZE: usize> {
+/// The `PACKET_SLOT_SIZE` is the size of the packet slot in bytes. This size **is not inclusive** of packet metadata.
+pub struct MaybeInitPacket<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const SLOT_SIZE: usize>where 
+[(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized {
     /// Size of the received packet. Is None if the packet is not initialized.
     recv_size: Option<NonZero<usize>>,
     // align to the alignment of the packet
-    packet: AlignedPacketBytes<T, AlignPayloadTo, PACKET_SLOT_SIZE>,
+    packet: AlignedPacketBytes<T, AlignPayloadTo, SLOT_SIZE>,
 }
 
-impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const SLOT_SIZE: usize> MaybeInitPacket<T, AlignPayloadTo, SLOT_SIZE> {
+impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const SLOT_SIZE: usize> MaybeInitPacket<T, AlignPayloadTo, SLOT_SIZE> where 
+[(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized{
     pub fn is_init(&self) -> bool {
         self.recv_size.is_some()
     }
@@ -93,7 +116,7 @@ where
     /// The span of the earliest sequence number and the latest sequence number of a received packet in the buffer.
     /// This can relied on as a hint for how full the buffer is. (i.e. how ahead is the latest received packet?)
     early_latest_span: u32,
-    buf: Box<[MaybeInitPacket<T, AlignPayloadTo, {size_of_packet::<[u8; SLOT_SIZE]>()}>; BUFFER_LENGTH]>,
+    buf: Box<[MaybeInitPacket<T, AlignPayloadTo, SLOT_SIZE>; BUFFER_LENGTH]>,
 }
 
 /// A packet that has been received and is ready to be consumed.
@@ -145,7 +168,7 @@ impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized, AlignPayloa
 where
     [(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized
 {
-    const fn generate_default_packet() -> MaybeInitPacket<T, AlignPayloadTo, {size_of_packet::<[u8; SLOT_SIZE]>()}> {
+    const fn generate_default_packet() -> MaybeInitPacket<T, AlignPayloadTo, SLOT_SIZE> {
         MaybeInitPacket {
             recv_size: None,
             packet: AlignedPacketBytes {
@@ -187,7 +210,7 @@ where
 
     /// Returns a reference to the [`MaybeInitPacket`] slot that corresponds to the given sequence number.
     /// Returns None if the corresponding packet is not present in the buffer.
-    pub fn get(&self, seq_num: u32) -> Option<&MaybeInitPacket<T, AlignPayloadTo, {size_of_packet::<[u8; SLOT_SIZE]>()}>> {
+    pub fn get(&self, seq_num: u32) -> Option<&MaybeInitPacket<T, AlignPayloadTo, SLOT_SIZE>> {
         if seq_num.wrapping_sub(self.earliest_seq) as usize >= self.buf.len() {
             None
         } else {
@@ -196,7 +219,7 @@ where
         }
     }
 
-    fn get_mut(&mut self, seq_num: u32) -> Option<&mut MaybeInitPacket<T, AlignPayloadTo, {size_of_packet::<[u8; SLOT_SIZE]>()}>> {
+    fn get_mut(&mut self, seq_num: u32) -> Option<&mut MaybeInitPacket<T, AlignPayloadTo, SLOT_SIZE>> {
         if seq_num.wrapping_sub(self.earliest_seq) as usize >= self.buf.len() {
             None
         } else {
@@ -206,8 +229,8 @@ where
     }
 }
 
-pub type RtpSizedPayloadSender<T: TryFromBytes + IntoBytes + Immutable + KnownLayout> = RtpSender<T, T, {size_of_packet::<T>()}>;
-pub type RtpSlicePayloadSender<Payload: TryFromBytes + IntoBytes + Immutable + KnownLayout> = RtpSender<[Payload], Payload, {size_of_packet::<Payload>()}>;
+pub type RtpSizedPayloadSender<T: TryFromBytes + IntoBytes + Immutable + KnownLayout> = RtpSender<T, T, {size_of::<T>()}>;
+pub type RtpSlicePayloadSender<Payload: TryFromBytes + IntoBytes + Immutable + KnownLayout> = RtpSender<[Payload], Payload, {size_of::<Payload>()}>;
 
 /// An RTP sender that sends packets over the network.
 pub struct RtpSender<Payload: TryFromBytes + IntoBytes + Immutable + KnownLayout + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const SLOT_SIZE: usize>
@@ -217,7 +240,7 @@ where
     sock: UdpSocket,
     seq_num: u32,
     /// A correctly aligned scratch buffer for writing packet data to.
-    scratch: AlignedPacketBytes<Payload, AlignPayloadTo, {size_of_packet::<[u8; SLOT_SIZE]>()}>,
+    scratch: AlignedPacketBytes<Payload, AlignPayloadTo, SLOT_SIZE>,
 }
 
 impl<Payload: TryFromBytes + IntoBytes + Immutable + KnownLayout + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const SLOT_SIZE: usize> RtpSender<Payload, AlignPayloadTo, SLOT_SIZE>
@@ -247,12 +270,16 @@ where
         // copying is actually faster than MSG_ZEROCOPY.
 
         let packet = &mut self.scratch;
+
         let header = PacketHeader::mut_from_bytes(&mut packet[0..size_of::<PacketHeader>()]).unwrap();
 
         header.sequence_number = self.seq_num.into();
         self.seq_num = self.seq_num.wrapping_add(1);
 
-        let mem = &mut packet[size_of::<PacketHeader>()..];
+        // Note that this is only correct because the alignment of the packet is the same as the alignment of the payload.
+
+        let packet_start_offset = offset_of!(Packet<AlignPayloadTo>, data);
+        let mem = &mut packet[packet_start_offset..];
         let len = fill(mem);
 
         super::udp_send_retry(&self.sock, &packet[..size_of::<PacketHeader>() + len]);
@@ -289,7 +316,8 @@ where
     rtp_circular_buffer: Arc<Mutex<RtpCircularBuffer<T, AlignPayloadTo, SLOT_SIZE, BUFFER_LENGTH>>>,
 }
 
-pub type RtpRecieverSized<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize> = RtpReciever<T, T, {size_of_packet::<T>()}, BUFFER_LENGTH>;
+pub type RtpSizedReciever<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize> = RtpReciever<T, T, {size_of::<T>()}, BUFFER_LENGTH>;
+pub type RtpSliceReciever<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize> = RtpReciever<[T], T, {size_of::<T>()}, BUFFER_LENGTH>;
 
 impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Send + 'static + Debug + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable + Send + 'static + Debug, const SLOT_SIZE: usize, const BUFFER_LENGTH: usize> RtpReciever<T, AlignPayloadTo, SLOT_SIZE, BUFFER_LENGTH>
 where
