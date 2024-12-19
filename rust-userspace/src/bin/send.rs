@@ -148,7 +148,7 @@ pub fn send_video() {
         receive_control(cloned_quality, receiver_communication_socket);
     });
 
-    let mut sender: RtpSlicePayloadSender<u8> = rtp::RtpSender::new(sock);
+    let mut sender: RtpSlicePayloadSender<u8, PACKET_SEND_THRESHOLD> = rtp::RtpSender::new(sock);
     let sender = Arc::new(Mutex::new(&mut sender));
 
     let mut frame_delay_buffer = FrameCircularBuffer::new();
@@ -186,7 +186,7 @@ pub fn send_video() {
             y: usize,
             x_end: usize,
             y_end: usize,
-            sender: Arc<Mutex<&mut RtpSlicePayloadSender<u8>>>,
+            sender: Arc<Mutex<&mut RtpSlicePayloadSender<u8, PACKET_SEND_THRESHOLD>>>,
         ) {
             let mut packet_buf = Vec::with_capacity(PACKET_SEND_THRESHOLD);
             packet_buf.put_u32(frame_count);

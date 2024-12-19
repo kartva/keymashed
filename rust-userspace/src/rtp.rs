@@ -229,8 +229,8 @@ where
     }
 }
 
-pub type RtpSizedPayloadSender<T: TryFromBytes + IntoBytes + Immutable + KnownLayout> = RtpSender<T, T, {size_of::<T>()}>;
-pub type RtpSlicePayloadSender<Payload: TryFromBytes + IntoBytes + Immutable + KnownLayout> = RtpSender<[Payload], Payload, {size_of::<Payload>()}>;
+pub type RtpSizedPayloadSender<Payload: TryFromBytes + IntoBytes + Immutable + KnownLayout> = RtpSender<Payload, Payload, {size_of::<Payload>()}>;
+pub type RtpSlicePayloadSender<SlicedPayload: TryFromBytes + IntoBytes + Immutable + KnownLayout, const MaxSliceLength: usize> = RtpSender<[SlicedPayload], SlicedPayload, {size_of::<SlicedPayload>() * MaxSliceLength}>;
 
 /// An RTP sender that sends packets over the network.
 pub struct RtpSender<Payload: TryFromBytes + IntoBytes + Immutable + KnownLayout + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable, const SLOT_SIZE: usize>
@@ -250,7 +250,7 @@ where
     /// Create a new RTP sender.
     /// The sender will bind to the given socket.
     /// The sender will use a scratch buffer of size `max_size` for packet serialization.
-    pub fn new_with_buf_size(sock: UdpSocket) -> Self {
+    pub fn new(sock: UdpSocket) -> Self {
         RtpSender {
             sock,
             seq_num: 0,
@@ -316,8 +316,8 @@ where
     rtp_circular_buffer: Arc<Mutex<RtpCircularBuffer<T, AlignPayloadTo, SLOT_SIZE, BUFFER_LENGTH>>>,
 }
 
-pub type RtpSizedReciever<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize> = RtpReciever<T, T, {size_of::<T>()}, BUFFER_LENGTH>;
-pub type RtpSliceReciever<T: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize> = RtpReciever<[T], T, {size_of::<T>()}, BUFFER_LENGTH>;
+pub type RtpSizedPayloadReciever<Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable, const BUFFER_LENGTH: usize> = RtpReciever<Payload, Payload, {size_of::<Payload>()}, BUFFER_LENGTH>;
+pub type RtpSlicePayloadReciever<SlicedPayload: TryFromBytes + IntoBytes + KnownLayout + Immutable, const MaxSliceLength: usize, const BUFFER_LENGTH: usize> = RtpReciever<[SlicedPayload], SlicedPayload, {size_of::<SlicedPayload>() * MaxSliceLength}, BUFFER_LENGTH>;
 
 impl<T: TryFromBytes + IntoBytes + KnownLayout + Immutable + Send + 'static + Debug + ?Sized, AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable + Send + 'static + Debug, const SLOT_SIZE: usize, const BUFFER_LENGTH: usize> RtpReciever<T, AlignPayloadTo, SLOT_SIZE, BUFFER_LENGTH>
 where

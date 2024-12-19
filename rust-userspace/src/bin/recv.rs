@@ -67,7 +67,7 @@ fn main() -> std::io::Result<()> {
 
     let video_recieving_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_VIDEO_PORT));
     video_recieving_socket.connect((SEND_IP, SEND_VIDEO_PORT)).unwrap();
-    let video_reciever = rtp::RtpSizedReciever::<VideoPacket, 8192>::new(video_recieving_socket);
+    let video_reciever = rtp::RtpSizedPayloadReciever::<VideoPacket, 8192>::new(video_recieving_socket);
 
     let sender_communication_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_CONTROL_PORT));
     sender_communication_socket.connect((SEND_IP, SEND_CONTROL_PORT)).unwrap();
