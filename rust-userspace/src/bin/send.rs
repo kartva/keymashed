@@ -148,7 +148,7 @@ pub fn send_video() {
         receive_control(cloned_quality, receiver_communication_socket);
     });
 
-    let mut sender: RtpSlicePayloadSender<[u8]> = rtp::RtpSender::new(sock);
+    let mut sender: RtpSlicePayloadSender<u8> = rtp::RtpSender::new(sock);
     let sender = Arc::new(Mutex::new(&mut sender));
 
     let mut frame_delay_buffer = FrameCircularBuffer::new();
