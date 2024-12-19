@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/f13cbadf-bcb7-433d-a5de-5e4c0cf470ff
   <img src="media/BURST 2024 SebMur-6-resized.jpg" width="49%" /> 
   <img src="media/BURST 2024 SebMur-19-resized.jpg" width="49%" />
   <img src="media/BURST 2024 SebMur-82-cropped.jpg" width="49%" />
-  <img src="media/BURST 2024 SemMur-66-cropped.jpg" width="49%" />
+  <img src="media/BURST 2024 SebMur-66-cropped.jpg" width="49%" />
 </p>
 
 ## The Exhibit
