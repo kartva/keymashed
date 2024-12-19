@@ -174,7 +174,7 @@ where
     [(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized;
 
 impl<
-        Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable,
+        Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized,
         AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable,
         const SLOT_SIZE: usize,
         const BUFFER_LENGTH: usize,
@@ -191,6 +191,7 @@ where
             ..
         }) = rtp_reciever.get(rtp_reciever.earliest_seq)
         {
+            log::trace!("Getting data from seq {} with len {}", rtp_reciever.earliest_seq, packet_len);
             Some(Packet::<Payload>::try_ref_from_bytes(&p[..((*packet_len).into())]).unwrap())
         } else {
             None
@@ -340,6 +341,11 @@ where
         }
     }
 
+    /// Get the seq num of the next packet to be sent.
+    pub fn seq_num(&self) -> u32 {
+        self.seq_num
+    }
+
     /// Send a packet over the network by filling data in the mutable slice.
     /// The closure `fill` is called with a mutable slice of the packet data, and should return the number of bytes to be sent.
     pub fn send_bytes<'a>(&'a mut self, fill: impl FnOnce(&mut [u8]) -> usize) {
@@ -353,16 +359,18 @@ where
             PacketHeader::mut_from_bytes(&mut packet[0..size_of::<PacketHeader>()]).unwrap();
 
         header.sequence_number = self.seq_num.into();
-        self.seq_num = self.seq_num.wrapping_add(1);
-
+        
         // Note that this is only correct because the alignment of the packet is the same as the alignment of the payload.
-
+        // Also #[repr(C)] on Packet should guarantee some amount of stability wrt. padding.
+        
         let packet_start_offset = offset_of!(Packet<AlignPayloadTo>, data);
         let mem = &mut packet[packet_start_offset..];
-        let len = fill(mem);
-
-        super::udp_send_retry(&self.sock, &packet[..size_of::<PacketHeader>() + len]);
-        log::trace!("sent seq: {}", self.seq_num);
+        let payload_len = fill(mem);
+        
+        super::udp_send_retry(&self.sock, &packet[..packet_start_offset + payload_len]);
+        log::trace!("sent seq: {} ({} bytes)", self.seq_num, packet_start_offset + payload_len);
+        
+        self.seq_num = self.seq_num.wrapping_add(1);
     }
 }
 
@@ -373,7 +381,7 @@ where
 // MaybeUninit does not implement IntoBytes and thus creating a mutable reference to it from the internal byte buffer is not possible.
 
 impl<
-        Payload: FromBytes + TryFromBytes + IntoBytes + Immutable + KnownLayout + ?Sized,
+        Payload: FromBytes + TryFromBytes + IntoBytes + Immutable + KnownLayout,
         AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable,
         const SLOT_SIZE: usize,
     > RtpSender<Payload, AlignPayloadTo, SLOT_SIZE>
@@ -508,11 +516,11 @@ fn accept_thread<
             let len = sock.recv(packet).unwrap();
             *init = Some(NonZero::new(len).expect("Packet should have non-zero length."));
 
-            if packet.len() > 16 {
+            if len > 16 {
                 log::trace!(
                     "received seq_num {seq_num} and raw data: {:?}... (len {})",
                     &packet[..16],
-                    packet.len()
+                    len
                 );
             } else {
                 log::trace!("received seq_num {seq_num} and raw data: {:?}", &packet);
