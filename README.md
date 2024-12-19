@@ -28,7 +28,8 @@ There are two effects at play:
 
 The livestream is delayed by 30 seconds, since it's more interesting to see a bit into the past rather than just looking at your own back.
 
-All of this combines to create the ✨magic keymashed experience✨:
+All of this combines to create the
+## ✨magic keymashed experience✨:
 _You walk up to the exhibit. There's a keyboard in front of you. The pedestal says, "Mash the keyboard". There are indistinct splotches of grey on the screen that may or may not be people standing around. As you start mashing, the image changes color and gains quality. The edges of the screen glow a bright green to indicate you're close to the peak. The image resolves into... not you. In the screen, you see yourself starting to approach the exhibit._
 
 The webcam is mounted on top of a wall along with an Optiplex with a wireless dongle. This is the sender computer. The receiver computer sits under the pedestal that holds the monitor.
