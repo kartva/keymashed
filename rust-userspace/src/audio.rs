@@ -9,27 +9,27 @@ pub const AUDIO_BUFFER_LENGTH: usize = 1024;
 
 pub struct AudioCallbackData {
     last: [f32; AUDIO_SAMPLE_COUNT],
-    recv: rtp::RtpSizedPayloadReciever<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH>,
+    recv: rtp::RtpSizedPayloadReceiver<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH>,
 }
 
 impl AudioCallback for AudioCallbackData {
     type Channel = f32;
 
     fn callback(&mut self, out: &mut [f32]) {
-        let mut locked_reciever = self.recv.lock_reciever();
+        let mut locked_receiver = self.recv.lock_receiver();
 
         // If the circular buffer hasn't seen enough future packets, wait for more to arrive
         // Handles the case: sender is falling behind in sending packets.
-        while locked_reciever.early_latest_span() < 5 {
-            log::debug!("Sleeping and waiting for more packets to arrive. Early-latest span {}", locked_reciever.early_latest_span());
-            drop(locked_reciever);
+        while locked_receiver.early_latest_span() < 5 {
+            log::debug!("Sleeping and waiting for more packets to arrive. Early-latest span {}", locked_receiver.early_latest_span());
+            drop(locked_receiver);
             std::thread::sleep(Duration::from_millis(
                 (1000 * AUDIO_SAMPLE_COUNT as u64) / (AUDIO_FREQUENCY as u64),
             ));
-            locked_reciever = self.recv.lock_reciever();
+            locked_receiver = self.recv.lock_receiver();
         }
 
-        let received_packet = locked_reciever.consume_earliest_packet();
+        let received_packet = locked_receiver.consume_earliest_packet();
 
         if let Some(packet) = received_packet.get_data() {
             log::info!("Playing packet with seq: {:?}", packet.header);
@@ -44,13 +44,13 @@ impl AudioCallback for AudioCallbackData {
 }
 
 /// Start playing audio from a UDP stream. Audio will play until returned device is dropped.
-/// Ensure that the frequency, sample count and bit depth of the sender and reciever match.
+/// Ensure that the frequency, sample count and bit depth of the sender and receiver match.
 
 pub fn play_audio(audio_subsystem: &sdl2::AudioSubsystem) -> AudioDevice<AudioCallbackData> {
     let sock = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_AUDIO_PORT));
     sock.connect((SEND_IP, SEND_AUDIO_PORT)).unwrap();
 
-    let recv: rtp::RtpSizedPayloadReciever<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH> = rtp::RtpReciever::new(sock);
+    let recv: rtp::RtpSizedPayloadReceiver<[f32; AUDIO_SAMPLE_COUNT], AUDIO_BUFFER_LENGTH> = rtp::RtpReceiver::new(sock);
 
     let desired_spec = AudioSpecDesired {
         freq: Some(AUDIO_FREQUENCY),

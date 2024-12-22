@@ -183,15 +183,15 @@ where
     [(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized,
 {
     pub fn get_data(&self) -> Option<&Packet<Payload>> {
-        let rtp_reciever = &self.0;
+        let rtp_receiver = &self.0;
 
         if let Some(MaybeInitPacket {
             recv_size: Some(packet_len),
             packet: p,
             ..
-        }) = rtp_reciever.get(rtp_reciever.earliest_seq)
+        }) = rtp_receiver.get(rtp_receiver.earliest_seq)
         {
-            log::trace!("Getting data from seq {} with len {}", rtp_reciever.earliest_seq, packet_len);
+            log::trace!("Getting data from seq {} with len {}", rtp_receiver.earliest_seq, packet_len);
             Some(Packet::<Payload>::try_ref_from_bytes(&p[..((*packet_len).into())]).unwrap())
         } else {
             None
@@ -209,15 +209,15 @@ where
     [(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized,
 {
     fn drop(&mut self) {
-        let rtp_reciever = &mut self.0;
+        let rtp_receiver = &mut self.0;
 
-        rtp_reciever
-            .get_mut(rtp_reciever.earliest_seq)
+        rtp_receiver
+            .get_mut(rtp_receiver.earliest_seq)
             .unwrap()
             .recv_size = None;
-        log::trace!("consumed seq {}", rtp_reciever.earliest_seq);
-        rtp_reciever.earliest_seq = rtp_reciever.earliest_seq.wrapping_add(1);
-        rtp_reciever.early_latest_span = rtp_reciever.early_latest_span.saturating_sub(1);
+        log::trace!("consumed seq {}", rtp_receiver.earliest_seq);
+        rtp_receiver.earliest_seq = rtp_receiver.earliest_seq.wrapping_add(1);
+        rtp_receiver.early_latest_span = rtp_receiver.early_latest_span.saturating_sub(1);
     }
 }
 
@@ -249,7 +249,7 @@ where
         }
     }
 
-    /// Returns the slot with the earlist seq_num in the circular buffer.
+    /// Returns the slot with the earliest seq_num in the circular buffer.
     /// Note that this slot may or may not contain a packet.
     /// The slot will be consumed upon dropping the returned value.
     pub fn consume_earliest_packet(
@@ -258,7 +258,7 @@ where
         ReceivedPacket(self)
     }
 
-    /// Returns a reference to the slotwith the earlist seq_num in the buffer.
+    /// Returns a reference to the slot with the earliest seq_num in the buffer.
     /// Returns None if the slot is not inhabited by a packet.
     pub fn peek_earliest_packet(&self) -> Option<&Packet<Payload>> {
         self.get(self.earliest_seq).and_then(|p| p.get_data())
@@ -399,8 +399,8 @@ where
     }
 }
 
-/// An RTP reciever that recieves packets over the network.
-pub struct RtpReciever<
+/// An RTP receiver that recieves packets over the network.
+pub struct RtpReceiver<
     Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized,
     AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable,
     const SLOT_SIZE: usize,
@@ -411,16 +411,16 @@ pub struct RtpReciever<
     rtp_circular_buffer: Arc<Mutex<RtpCircularBuffer<Payload, AlignPayloadTo, SLOT_SIZE, BUFFER_LENGTH>>>,
 }
 
-pub type RtpSizedPayloadReciever<
+pub type RtpSizedPayloadReceiver<
     Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable,
     const BUFFER_LENGTH: usize,
-> = RtpReciever<Payload, Payload, { size_of::<Payload>() }, BUFFER_LENGTH>;
+> = RtpReceiver<Payload, Payload, { size_of::<Payload>() }, BUFFER_LENGTH>;
 
-pub type RtpSlicePayloadReciever<
+pub type RtpSlicePayloadReceiver<
     SlicedPayload: TryFromBytes + IntoBytes + KnownLayout + Immutable,
     const MAX_SLICE_LENGTH: usize,
     const BUFFER_LENGTH: usize,
-> = RtpReciever<
+> = RtpReceiver<
     [SlicedPayload],
     SlicedPayload,
     { size_of::<SlicedPayload>() * MAX_SLICE_LENGTH },
@@ -432,7 +432,7 @@ impl<
         AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable + Send + 'static + Debug,
         const SLOT_SIZE: usize,
         const BUFFER_LENGTH: usize,
-    > RtpReciever<Payload, AlignPayloadTo, SLOT_SIZE, BUFFER_LENGTH>
+    > RtpReceiver<Payload, AlignPayloadTo, SLOT_SIZE, BUFFER_LENGTH>
 where
     [(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized,
 {
@@ -445,13 +445,13 @@ where
             accept_thread(sock, cloned_rtp_circular_buffer);
         });
 
-        RtpReciever {
+        RtpReceiver {
             rtp_circular_buffer,
         }
     }
 
     /// Locks the buffer for interaction.
-    pub fn lock_reciever(
+    pub fn lock_receiver(
         &self,
     ) -> MutexGuard<'_, RtpCircularBuffer<Payload, AlignPayloadTo, SLOT_SIZE, BUFFER_LENGTH>> {
         self.rtp_circular_buffer.lock().unwrap()

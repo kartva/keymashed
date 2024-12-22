@@ -9,7 +9,7 @@ clang -target bpf -O2 -g -o bpf.o -c bpf.c
 
 sudo tc qdisc add dev wlp3s0 ingress
 
-# add the prio classful qdisc to the network adator
+# add the prio classful qdisc to the network adaptor
 
 sudo tc qdisc add dev wlp3s0 root handle 1: prio
 

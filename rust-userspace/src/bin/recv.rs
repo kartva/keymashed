@@ -65,7 +65,7 @@ fn main() -> std::io::Result<()> {
 
     let video_recieving_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_VIDEO_PORT));
     video_recieving_socket.connect((SEND_IP, SEND_VIDEO_PORT)).unwrap();
-    let video_reciever = rtp::RtpSlicePayloadReciever::<u8, PACKET_PAYLOAD_SIZE_THRESHOLD, 8192>::new(video_recieving_socket);
+    let video_receiver = rtp::RtpSlicePayloadReceiver::<u8, PACKET_PAYLOAD_SIZE_THRESHOLD, 8192>::new(video_recieving_socket);
 
     let sender_communication_socket = udp_connect_retry((Ipv4Addr::UNSPECIFIED, RECV_CONTROL_PORT));
     sender_communication_socket.connect((SEND_IP, SEND_CONTROL_PORT)).unwrap();
@@ -121,12 +121,12 @@ fn main() -> std::io::Result<()> {
         renderer.clear();
 
         texture.with_lock(None, |buffer: &mut [u8], _pitch: usize| {            
-            let mut locked_video_reciever = video_reciever.lock_reciever();
+            let mut locked_video_receiver = video_receiver.lock_receiver();
 
             // If the circular buffer hasn't seen enough future packets, wait for more to arrive
             // Handles the case: sender is falling behind in sending packets.
-            if locked_video_reciever.early_latest_span() < 20 {
-                log::info!("Sleeping and waiting for more packets to arrive. Early-latest span {}", locked_video_reciever.early_latest_span());
+            if locked_video_receiver.early_latest_span() < 20 {
+                log::info!("Sleeping and waiting for more packets to arrive. Early-latest span {}", locked_video_receiver.early_latest_span());
                 return;
             }
 
@@ -144,7 +144,7 @@ fn main() -> std::io::Result<()> {
                 // Handles the case: receiver is falling behind in consuming packets.
                 log::trace!("Playing Frame {frame_count} packet index: {}", packet_index);
                 
-                if let Some(p) = locked_video_reciever.peek_earliest_packet() {
+                if let Some(p) = locked_video_receiver.peek_earliest_packet() {
                     let mut cursor = &p.data[..];
                     let packet_frame_count = cursor.get_u32();
                     if packet_frame_count > frame_count {
@@ -154,7 +154,7 @@ fn main() -> std::io::Result<()> {
                     }
                 }
 
-                let packet = locked_video_reciever.consume_earliest_packet();
+                let packet = locked_video_receiver.consume_earliest_packet();
                 if let Some(packet) = packet.get_data() {
                     // copy the packet data into the buffer
                     let mut cursor = &packet.data[..];
