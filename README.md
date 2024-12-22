@@ -86,17 +86,35 @@ I decided to re-invent the Real-time protocol from scratch, with a focus on redu
 
 ### Video Codec
 
-The webcam transmits video in the `YUV422` format. The [`YUV`](https://en.wikipedia.org/wiki/YCbCr) format is an alternative to the more well-known `RGB` format; it encodes the luminance (`Y`), blue-difference chroma (`Cb`/`U`) and red-difference chroma (`Cr/`V`). The `422` refers the [chroma subsamping](https://en.wikipedia.org/wiki/Chroma_subsampling), explained below.
+The webcam transmits video in the `YUV422` format. The [`YUV`](https://en.wikipedia.org/wiki/YCbCr) format is an alternative to the more well-known `RGB` format; it encodes the luminance (`Y`), blue-difference chroma (`Cb`/`U`) and red-difference chroma (`Cr`/`V`).
+
+![A group of pixels 2 tall and 4 wide.](media/YUV444.drawio.svg)
+
+The `422` refers the [chroma subsamping](https://en.wikipedia.org/wiki/Chroma_subsampling), explained below.
+
+![](media/YUV422.drawio.svg)
 
 After receiving the video from the webcam, the video sender further subsamples the colors into 4:2:0.
 
+![](media/YUV420.drawio.svg)
+
 The subsampled frame is then broken into _macroblocks_ of 16 x 16 pixels which contain six _blocks_ of 8 x 8 values: four for luminance, one for red-difference and one for blue-difference. (Note that a group of four pixels has six associated values).
+
+![](media/Macroblock.drawio.svg)
+
+The macroblock.
+
+![](media/MacroblockExpanded.drawio.svg)
+
+The macroblock, decomposed into its six constituent blocks.
 
 Each block is encoded using the [DCT transform](https://en.wikipedia.org/wiki/Discrete_cosine_transform).
 
 After the transformation, the values are divided element-wise by the _quantization matrix_, which is specially chosen to minimize perceptual quality loss.
 
 Finally, the quantized block is run-length encoded in a zig-zag pattern. This causes zero values to end up at the end, which makes our naive encoding quite efficient on its own.
+
+![](media/Zigzag.drawio.svg)
 
 Encoded macroblocks are inserted into a packet with the following metadata and then sent over the network.
 ```
