@@ -2,11 +2,12 @@ _Ya know, how sometimes your computer's internet is slow?_
 
 _What if... you could motivate it. Make the internet itself flow a lil' quicker._
 
-## Keymashed
+# Keymashed
 
-An interactive installation at [Purdue Hacker's BURST](https://burst.purduehackers.com/). Since making the internet faster is a hard research problem, `keymashed` instead settles for slowing down the internet and then easing up on the impairment based on how many keys you mash. Observe the effects of your encouragement through a bad video protocol made for your enjoyment. Mash a variety of keys for best effect.
+  <img align="right" src="https://github.com/user-attachments/assets/27412e69-7cbc-4a01-9383-3a5e2ed242dd" style="width:125px;">
+  An interactive installation at <a href="https://burst.purduehackers.com/">Purdue Hackers' BURST</a>. Since making the internet faster is a hard research problem, <code>keymashed</code> instead settles for slowing down the internet and then easing up on the impairment based on how fast you mash the keyboard. Observe the effects of your encouragement through a bad video protocol made for your enjoyment. Mash a variety of keys for best effect.<sup>\
 
-https://github.com/user-attachments/assets/f13cbadf-bcb7-433d-a5de-5e4c0cf470ff
+## Gallery
 
 <p float="left">
   <img src="media/BURST 2024 SebMur-6-resized.jpg" width="49%" /> 
@@ -14,6 +15,8 @@ https://github.com/user-attachments/assets/f13cbadf-bcb7-433d-a5de-5e4c0cf470ff
   <img src="media/BURST 2024 SebMur-82-cropped.jpg" width="49%" />
   <img src="media/BURST 2024 SebMur-66-cropped.jpg" width="49%" />
 </p>
+
+https://github.com/user-attachments/assets/f13cbadf-bcb7-433d-a5de-5e4c0cf470ff
 
 ## The Exhibit
 
@@ -28,9 +31,10 @@ There are two effects at play:
 
 The livestream is delayed by 30 seconds, since it's more interesting to see a bit into the past rather than just looking at your own back.
 
-All of this combines to create the
-## ✨magic keymashed experience✨:
-_You walk up to the exhibit. There's a keyboard in front of you. The pedestal says, "Mash the keyboard". There are indistinct splotches of grey on the screen that may or may not be people standing around. As you start mashing, the image changes color and gains quality. The edges of the screen glow a bright green to indicate you're close to the peak. The image resolves into... not you. In the screen, you see yourself starting to approach the exhibit._
+All of this combines to create the:
+
+## ✨the keymashed experience✨:
+_You walk up to the exhibit. There's a keyboard in front of you. The pedestal says, "Mash the keyboard". There are indistinct splotches of grey on the screen that may or may not be people standing around. As you start mashing, the image gains quality and smoothness. The edges of the screen glow a bright green to indicate you're close to the peak. The image resolves into a birds-eye view of the pedestal. In the screen, you see yourself starting to approach the exhibit._
 
 The webcam is mounted on top of a wall along with an Optiplex with a wireless dongle. This is the sender computer. The receiver computer sits under the pedestal that holds the monitor.
 <img src="media/BURST 2024 suspiciously-optiplex shaped box.jpg" />
@@ -44,10 +48,10 @@ The repository consists of the following components:
 - a video codec which uses a JPEG-like scheme to lossily compress blocks of frames which are then reassembled and decompressed on the receiver. The quality of the JPEG encoding can vary per block.
 - an RTP-like protocol for receiving packets over UDP.
 
-Consult the READMEs in the directories for more details on each component.
+### eBPF component
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/27412e69-7cbc-4a01-9383-3a5e2ed242dd" style="height: 40%; width: 40%;" />
-  <br>
-   Poster design by Rebecca Pine and pixel art by Jadden Picardal.
-</p>
+# Credits
+Poster design by Rebecca Pine and pixel art by Jadden Picardal.
+Most photos by Sebastian Murariu.
+
+Consult the READMEs in the directories for more details on each component.
