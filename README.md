@@ -5,7 +5,7 @@ _What if... you could motivate it. Make the internet itself flow a lil' quicker.
 # Keymashed
 
   <img align="right" src="https://github.com/user-attachments/assets/27412e69-7cbc-4a01-9383-3a5e2ed242dd" style="width:125px;">
-  An interactive installation at <a href="https://burst.purduehackers.com/">Purdue Hackers' BURST</a>. Since making the internet faster is a hard research problem, <code>keymashed</code> instead settles for slowing down the internet and then easing up on the impairment based on how fast you mash the keyboard. Observe the effects of your encouragement through a bad video protocol made for your enjoyment. Mash a variety of keys for best effect.
+  An interactive installation at <a href="https://burst.purduehackers.com/">Purdue Hackers' BURST</a>. Since making the internet faster is a hard research problem, <code>keymashed</code> instead settles for worsening the internet and then easing up on the impairment based on how fast you mash the keyboard. Observe the effects of your encouragement through a bad video protocol made for your enjoyment. Mash a variety of keys for best effect.
 
 ## Gallery
 
@@ -26,7 +26,7 @@ Keymashed as an exhibit consisted of:
 - Two Dell Optiplexes (cheap desktop computers) that are connected to the monitor and webcam. They communicate with each other over the internet.
 
 There are two effects at play:
-- UDP packets are being lost on the livestream playing computer at the network interface level. The more keys you mash, the less packets are lost. At the threshold, packet loss stops occurring.
+- UDP packets are being dropped on the livestream playing computer at the network interface level. The more keys you mash, the less packets are lost. At the threshold, packet loss stops occurring.
 - Frames are being encoded lossily on the livestream sender computer. The more keys you mash, the lower the lossy compression. At the threshold, the image becomes clear without any color banding.
 
 The livestream is delayed by 30 seconds, since it's more interesting to see a bit into the past rather than just looking at your own back.
@@ -50,8 +50,89 @@ The repository consists of the following components:
 
 ### eBPF component
 
+[eBPF](https://ebpf.io/) is a relatively recent feature in the Linux kernel which allows running sandboxed user-provided code in the kernel inside a virtual machine. It is used in [many kernel subsystems which deal with security, tracing and networking](https://docs.ebpf.io/linux/program-type/).
+
+We create an eBPF filter in [bpf.c](bpf/bpf.c) which reads the drop probability from a file which user programs can write to and then decides whether to drop the current packet or not. This eBPF filter is installed at a network interface using the `tc` (traffic control) utility.
+
+```c
+struct {
+  // declare that the bpf map will be of type array, mapping uint32_t to uint32_t and have a maximum of one entry.
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(key_size, sizeof(uint32_t)); 
+	__uint(value_size, sizeof(uint32_t));
+	__uint(max_entries, 1);
+  // PIN_BY_NAME ensures that the map is pinned in /sys/fs/bpf
+	__uint(pinning, LIBBPF_PIN_BY_NAME);
+  // synchronize the `map_keymash` name with the userspace program
+} map_mash __section(".maps");
+
+__section("classifier")
+int scream_bpf(struct __sk_buff *skb)
+{
+  uint32_t key = 0, *val = 0;
+
+	val = map_lookup_elem(&map_mash, &key);
+	if (val && get_prandom_u32() < *val) {
+		return TC_ACT_SHOT; // Drop packet
+	}
+    return TC_ACT_OK; // Pass packet
+}
+```
+
+The userspace code interacts with the eBPF filter using the `bpf_obj_get` and `bpf_map_update_elem` functions from `libbpf`.
+
+### Real-time UDP streaming
+I decided to re-invent the Real-time protocol from scratch, with a focus on reduci90ng copies as much as possible. It makes heavy use of the `zerocopy` crate. The result is some rather complex Rust code that I'm quite happy with.
+
+### Video Codec
+
+The webcam transmits video in the `YUV422` format. The [`YUV`](https://en.wikipedia.org/wiki/YCbCr) format is an alternative to the more well-known `RGB` format; it encodes the luminance (`Y`), blue-difference chroma (`Cb`/`U`) and red-difference chroma (`Cr/`V`). The `422` refers the [chroma subsamping](https://en.wikipedia.org/wiki/Chroma_subsampling), explained below.
+
+After receiving the video from the webcam, the video sender further subsamples the colors into 4:2:0.
+
+The subsampled frame is then broken into _macroblocks_ of 16 x 16 pixels which contain six _blocks_ of 8 x 8 values: four for luminance, one for red-difference and one for blue-difference. (Note that a group of four pixels has six associated values).
+
+Each block is encoded using the [DCT transform](https://en.wikipedia.org/wiki/Discrete_cosine_transform).
+
+After the transformation, the values are divided element-wise by the _quantization matrix_, which is specially chosen to minimize perceptual quality loss.
+
+Finally, the quantized block is run-length encoded in a zig-zag pattern. This causes zero values to end up at the end, which makes our naive encoding quite efficient on its own.
+
+Encoded macroblocks are inserted into a packet with the following metadata and then sent over the network.
+```
+|---------------|
+|  Frame no.    |
+|---------------|
+| Block 1       |
+| x, y, quality |
+| RLE data      |
+|---------------|
+| Block 2       |
+| x, y, quality |
+| RLE data      |
+|---------------|
+|      ...      |
+```
+
+### User-level application
+The application itself uses `SDL2` for handling key input and rendering the video.
+
+## Project Evolution
+
+"what if you could scream at your computer to make it run faster?" was the original question I asked. We (@kartva and @9p4) wrote `run-louder`/`screamd` (we went through many names) which would spawn a child process, say Google Chrome, and intercept all syscalls made by it using `ptrace` (the same syscall that `gdb` uses). After intercepting a syscall, the parent would sleep for some time (proportional to scream intensity) before resuming the child.
+
+We demoed it and have a shaky video of:
+- trying to open Chrome but it's stuck loading
+- coming up to the laptop and yelling at it
+- Chrome immediately loads
+
+As an extension to this idea, I started working on affecting the network as well by dropping packets. At this point, I decided to present `run-louder`/`screamd` at BURST, which necessitated changing screaming to key-mashing (out of respect for the art gallery setting). Additionally, while `ping` works fine as a method of demoing packet loss, I wanted something more visual and thus ended up writing the video codec.
+
+# About the author / hire me!
+_I'm looking for Summer 2025 internships._ Read more about my work at [my Github profile](https://github.com/kartva/).
+
 # Credits
+
+@9p4 helped a lot with initial ideation and prototyping.
 Poster design by Rebecca Pine and pixel art by Jadden Picardal.
 Most photos by Sebastian Murariu.
-
-Consult the READMEs in the directories for more details on each component.
