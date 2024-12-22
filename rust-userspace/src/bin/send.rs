@@ -1,28 +1,23 @@
 #![feature(generic_const_exprs)]
 
-use memmap::MmapMut;
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use rtp::RtpSlicePayloadSender;
 use run_louder::*;
 
 use bytes::BufMut;
-use rtp::RtpSender;
 use std::convert::Infallible;
 use std::net::Ipv4Addr;
 use std::net::UdpSocket;
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::RwLock;
-use std::{io::Write, time::Duration};
+use std::time::Duration;
 use video::{
     encode_quantized_macroblock, quantize_macroblock, MacroblockWithPosition, YUVFrame,
     YUVFrameMacroblockIterator,
 };
 use zerocopy::FromBytes;
-
-use simplelog::WriteLogger;
 
 fn main() -> std::io::Result<()> {
     run_louder::init_logger(true);

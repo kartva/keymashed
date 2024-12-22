@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod fft2d_dct {
     use fft2d::slice::dcst::{dct_2d, idct_2d};
 

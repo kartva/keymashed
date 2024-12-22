@@ -301,8 +301,8 @@ pub type RtpSizedPayloadSender<Payload: TryFromBytes + IntoBytes + Immutable + K
 
 pub type RtpSlicePayloadSender<
     SlicedPayload: TryFromBytes + IntoBytes + Immutable + KnownLayout,
-    const MaxSliceLength: usize,
-> = RtpSender<[SlicedPayload], SlicedPayload, { size_of::<SlicedPayload>() * MaxSliceLength }>;
+    const MAX_SLICE_LENGTH: usize,
+> = RtpSender<[SlicedPayload], SlicedPayload, { size_of::<SlicedPayload>() * MAX_SLICE_LENGTH }>;
 
 /// An RTP sender that sends packets over the network.
 pub struct RtpSender<
@@ -418,12 +418,12 @@ pub type RtpSizedPayloadReciever<
 
 pub type RtpSlicePayloadReciever<
     SlicedPayload: TryFromBytes + IntoBytes + KnownLayout + Immutable,
-    const MaxSliceLength: usize,
+    const MAX_SLICE_LENGTH: usize,
     const BUFFER_LENGTH: usize,
 > = RtpReciever<
     [SlicedPayload],
     SlicedPayload,
-    { size_of::<SlicedPayload>() * MaxSliceLength },
+    { size_of::<SlicedPayload>() * MAX_SLICE_LENGTH },
     BUFFER_LENGTH,
 >;
 

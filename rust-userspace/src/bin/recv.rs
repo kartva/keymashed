@@ -6,9 +6,7 @@ use bytes::Buf;
 use sdl2::{self, pixels::{Color, PixelFormatEnum}, rect::Rect};
 use video::{decode_quantized_macroblock, dequantize_macroblock, MutableYUVFrame};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-use std::{io::Write, net::{Ipv4Addr, UdpSocket}, thread::sleep, time::Duration};
-
-use simplelog::WriteLogger;
+use std::{net::Ipv4Addr, time::Duration};
 
 #[derive(FromBytes, Debug, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
@@ -162,10 +160,8 @@ fn main() -> std::io::Result<()> {
                     let mut cursor = &packet.data[..];
                     log::trace!("Packet slice has length {}", cursor.len());
 
-                    let cursor_start_len = cursor.len();
                     let _packet_frame_count = cursor.get_u32();
                     loop {
-                        let cursor_position = cursor_start_len - cursor.remaining();
                         let x = cursor.get_u16() as usize;
                         let y = cursor.get_u16() as usize;
                         
@@ -175,8 +171,6 @@ fn main() -> std::io::Result<()> {
                         let quality = cursor.get_f64();
 
                         block_written[y / MACROBLOCK_Y_DIM][x / MACROBLOCK_X_DIM] = true;
-
-                        // log::trace!("Receiving MacroblockWithPos at ({frame_count}, {x}, {y}) at cursor position {cursor_position}");
 
                         let decoded_quantized_macroblock;
                         (decoded_quantized_macroblock, cursor) = decode_quantized_macroblock(&cursor);

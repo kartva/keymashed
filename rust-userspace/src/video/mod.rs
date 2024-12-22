@@ -1,11 +1,8 @@
-use std::{
-    default,
-    ops::{Index, IndexMut},
-};
+use std::ops::{Index, IndexMut};
 
 mod dct;
 
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unalign, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 #[derive(FromBytes, Immutable, KnownLayout, Unaligned, IntoBytes)]
 #[repr(C)]
@@ -34,8 +31,7 @@ pub struct YUVFrame<'a> {
 pub struct MutableYUVFrame<'a> {
     /// Width of the frame in pixels.
     width: usize,
-    /// Height of the frame in pixels.
-    height: usize,
+    _height: usize,
     /// Data of the frame. Number of YUV422 samples will be (width / 2) * height,
     /// since each sample is two pixels.
     data: &'a mut [YUYV422Sample],
@@ -76,7 +72,7 @@ impl<'a> MutableYUVFrame<'a> {
         assert_eq!(data.len(), width * height / 2);
         Self {
             width,
-            height,
+            _height: height,
             data,
         }
     }
@@ -128,11 +124,6 @@ pub struct Macroblock {
     pub v: [[u8; 8]; 8],
 }
 
-pub struct MacroBlockIterMut<'a> {
-    block: &'a mut Macroblock,
-    block_num: usize,
-}
-
 impl Macroblock {
     /// Copy macroblock into a YUV422 buffer at given x and y coordinates.
     pub fn copy_to_yuv422_frame<'a>(&self, mut frame: MutableYUVFrame<'a>, x: usize, y: usize) {
@@ -157,13 +148,6 @@ impl Macroblock {
             }
         }
     }
-
-    pub fn iter_mut(&mut self) -> MacroBlockIterMut {
-        MacroBlockIterMut {
-            block: self,
-            block_num: 0
-        }
-    }
 }
 
 #[derive(Default, Clone, Debug)]
@@ -176,7 +160,9 @@ pub struct MacroblockWithPosition {
 pub struct YUVFrameMacroblockIterator<'a> {
     frame: &'a YUVFrame<'a>,
     x_start: usize,
-    y_start: usize,
+    /// While our current implementation doesn't need this,
+    /// it's useful if we decide to change iteration order.
+    _y_start: usize,
     x: usize,
     y: usize,
     x_end: usize,
@@ -185,12 +171,12 @@ pub struct YUVFrameMacroblockIterator<'a> {
 
 impl<'a> YUVFrameMacroblockIterator<'a> {
     pub fn new(frame: &'a YUVFrame<'a>) -> Self {
-        Self { frame, x_start: 0, y_start: 0, x: 0, y: 0, x_end: frame.width, y_end: frame.height }
+        Self { frame, x_start: 0, _y_start: 0, x: 0, y: 0, x_end: frame.width, y_end: frame.height }
     }
 
     /// Iterate over a subset of the frame defined by the rectangle (x, y) to (x_end, y_end).
     pub fn new_with_bounds(frame: &'a YUVFrame<'a>, x_start: usize, y_start: usize, x_end: usize, y_end: usize) -> Self {
-        Self { frame, x_start, y_start, x: x_start, y: y_start, x_end, y_end }
+        Self { frame, x_start, _y_start: y_start, x: x_start, y: y_start, x_end, y_end }
     }
 }
 
