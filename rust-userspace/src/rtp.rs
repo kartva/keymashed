@@ -367,7 +367,7 @@ where
         let mem = &mut packet[packet_start_offset..];
         let payload_len = fill(mem);
         
-        super::udp_send_retry(&self.sock, &packet[..packet_start_offset + payload_len]);
+        super::udp_send(&self.sock, &packet[..packet_start_offset + payload_len]);
         log::trace!("sent seq: {} ({} bytes)", self.seq_num, packet_start_offset + payload_len);
         
         self.seq_num = self.seq_num.wrapping_add(1);

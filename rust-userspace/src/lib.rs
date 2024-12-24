@@ -72,10 +72,9 @@ pub fn init_logger(_is_send: bool) {
     .unwrap();
 }
 
-pub fn udp_send_retry(sock: &UdpSocket, buf: &[u8]) {
-    while let Err(e) = sock.send(buf) {
+pub fn udp_send(sock: &UdpSocket, buf: &[u8]) {
+    if let Err(e) = sock.send(buf) {
         log::error!("Error sending packet from {:?} -> {:?}: {}", sock.peer_addr(), sock.local_addr(), e);
-        std::thread::sleep(Duration::from_millis(500));
     }
 }
 

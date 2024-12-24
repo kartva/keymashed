@@ -112,7 +112,7 @@ fn main() -> std::io::Result<()> {
         // send desired quality to sender
         let quality = wpm::wpm_to_jpeg_quality(wpm);
         let control_msg = ControlMessage { quality };
-        udp_send_retry(&sender_communication_socket, control_msg.as_bytes());
+        udp_send(&sender_communication_socket, control_msg.as_bytes());
         log::debug!("Sent quality update: {}", quality);
 
         // Draw video
@@ -122,6 +122,7 @@ fn main() -> std::io::Result<()> {
 
         texture.with_lock(None, |buffer: &mut [u8], _pitch: usize| {            
             let mut locked_video_receiver = video_receiver.lock_receiver();
+            let mut output_yuv_frame = MutableYUVFrame::new(VIDEO_WIDTH as usize, VIDEO_HEIGHT as usize, buffer);
 
             // If the circular buffer hasn't seen enough future packets, wait for more to arrive
             // Handles the case: sender is falling behind in sending packets.
@@ -175,7 +176,7 @@ fn main() -> std::io::Result<()> {
                         let decoded_quantized_macroblock;
                         (decoded_quantized_macroblock, cursor) = decode_quantized_macroblock(&cursor);
                         let macroblock = dequantize_macroblock(&decoded_quantized_macroblock, quality);
-                        macroblock.copy_to_yuv422_frame(MutableYUVFrame::new(VIDEO_WIDTH as usize, VIDEO_HEIGHT as usize, buffer), x, y);
+                        macroblock.copy_to_yuv422_frame(&mut output_yuv_frame, x, y);
                         packet_index += 1;
                     }
                 }

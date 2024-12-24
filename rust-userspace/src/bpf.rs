@@ -18,6 +18,7 @@ pub enum BpfError {
     MapWrite(c_int),
 }
 
+/// Opens the eBPF map.
 pub unsafe fn init() -> Result<BpfHandle, BpfError> {
     let res = bpf_obj_get(BPF_MAP_NAME.as_ptr());
     if res < 0 {
@@ -28,6 +29,7 @@ pub unsafe fn init() -> Result<BpfHandle, BpfError> {
 }
 
 impl BpfHandle {
+    /// Write a key-value pair to the eBPF map.
     pub fn write_to_map(&self, key: u32, value: u32) -> Result<(), BpfError> {
         unsafe {
             let res = libbpf_sys::bpf_map_update_elem(

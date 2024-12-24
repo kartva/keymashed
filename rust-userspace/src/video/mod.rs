@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-mod dct;
+pub mod dct;
 
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
@@ -16,6 +16,27 @@ pub struct YUYV422Sample {
     y1: u8,
     /// Cr
     v: u8,
+}
+
+impl YUYV422Sample {
+    pub fn from_rgb24(rgb: &[u8; 6]) -> Self {
+        fn rgb_to_yuv(r: u8, g: u8, b: u8) -> (u8, u8, u8) {
+            let y = (0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32) as u8;
+            let u = (128.0 - 0.168736 * r as f32 - 0.331264 * g as f32 + 0.5 * b as f32) as u8;
+            let v = (128.0 + 0.5 * r as f32 - 0.418688 * g as f32 - 0.081312 * b as f32) as u8;
+            (y, u, v)
+        }
+
+        let (y0, u0, v0) = rgb_to_yuv(rgb[0], rgb[1], rgb[2]);  // First pixel
+        let (y1, _, _) = rgb_to_yuv(rgb[3], rgb[4], rgb[5]);  // Second pixel
+
+        Self {
+            y0,
+            u: u0,
+            y1,
+            v: v0,
+        }
+    }
 }
 
 pub struct YUVFrame<'a> {
@@ -126,7 +147,7 @@ pub struct Macroblock {
 
 impl Macroblock {
     /// Copy macroblock into a YUV422 buffer at given x and y coordinates.
-    pub fn copy_to_yuv422_frame<'a>(&self, mut frame: MutableYUVFrame<'a>, x: usize, y: usize) {
+    pub fn copy_to_yuv422_frame<'a>(&self, frame: &mut MutableYUVFrame<'a>, x: usize, y: usize) {
         for (y_block, x_start, x_end, y_start, y_end) in [
             (&self.y0, 0, 8, 0, 8),
             (&self.y1, 8, 16, 0, 8),
@@ -226,7 +247,7 @@ impl<'a> Iterator for YUVFrameMacroblockIterator<'a> {
 // ref: https://github.com/autergame/JpegView-Rust/blob/main/src/jpeg.rs
 /// Standard JPEG luminance quantization table
 #[rustfmt::skip]
-const LUMINANCE_QUANTIZATION_TABLE: [[f64; 8]; 8] = [
+pub const LUMINANCE_QUANTIZATION_TABLE: [[f64; 8]; 8] = [
 	[16.0f64, 11.0f64, 10.0f64, 16.0f64,  24.0f64,  40.0f64,  51.0f64,  61.0f64],
 	[12.0f64, 12.0f64, 14.0f64, 19.0f64,  26.0f64,  58.0f64,  60.0f64,  55.0f64],
 	[14.0f64, 13.0f64, 16.0f64, 24.0f64,  40.0f64,  57.0f64,  69.0f64,  56.0f64],
@@ -239,7 +260,7 @@ const LUMINANCE_QUANTIZATION_TABLE: [[f64; 8]; 8] = [
 
 /// Standard JPEG chrominance quantization table
 #[rustfmt::skip]
-const CHROMINANCE_QUANTIZATION_TABLE: [[f64; 8]; 8] = [
+pub const CHROMINANCE_QUANTIZATION_TABLE: [[f64; 8]; 8] = [
 	[17.0f64, 18.0f64, 24.0f64, 47.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64],
 	[18.0f64, 21.0f64, 26.0f64, 66.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64],
 	[24.0f64, 26.0f64, 56.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64, 99.0f64],
@@ -277,7 +298,7 @@ fn dequantize_block(
 }
 
 /// Range quality from 0.3 to 0.03. (Lower is better)
-fn quality_scaled_q_matrix(q_matrix: &[[f64; 8]; 8], quality: f64) -> [[f64; 8]; 8] {
+pub fn quality_scaled_q_matrix(q_matrix: &[[f64; 8]; 8], quality: f64) -> [[f64; 8]; 8] {
     q_matrix.map(|row| row.map(|x| x * quality))
 }
 
@@ -318,12 +339,12 @@ pub fn dequantize_macroblock(block: &QuantizedMacroblock, quality: f64) -> Macro
 /// with 4 8x8 blocks for Y and 1 8x8 block for U and V each.
 #[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct QuantizedMacroblock {
-    y0: [[i8; 8]; 8],
-    y1: [[i8; 8]; 8],
-    y2: [[i8; 8]; 8],
-    y3: [[i8; 8]; 8],
-    u: [[i8; 8]; 8],
-    v: [[i8; 8]; 8],
+    pub y0: [[i8; 8]; 8],
+    pub y1: [[i8; 8]; 8],
+    pub y2: [[i8; 8]; 8],
+    pub y3: [[i8; 8]; 8],
+    pub u: [[i8; 8]; 8],
+    pub v: [[i8; 8]; 8],
 }
 
 #[derive(FromBytes, KnownLayout, IntoBytes, Immutable, Unaligned)]
