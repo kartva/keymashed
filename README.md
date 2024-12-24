@@ -128,14 +128,29 @@ Finally, the quantized block is run-length encoded in a zig-zag pattern. This ca
 
 ![](media/Zigzag.drawio.svg)
 
+Run-length encoding encodes a stream of data as pairs of (value, count) where count is the number of times the value is repeated.
+```
+And so [54, 23, 23, 1, 1, 1, 0, 0, 0, ... 23 more times ...] gets encoded as [(54, 1), (23, 2), (1, 3), (0, 26), ...] which is quite efficient.
+```
+
 You can observe the final outcome of this effect as a video:
 
 https://github.com/user-attachments/assets/489e3978-6acb-4a16-af49-40a0fb24831a
 
-The upper-left quadrant is the original video; the upper-left is the DCT blocks in the YUV color space (values close to zero in YUV look like an intense green).
-The bottom-left is the quantized then dequentized DCT blocks (note how the high-frequency components get zeroed out); the bottom-right is the reconstructed video.
+|      | left           | right |
+|------|----------------|-------------------------------|
+| top  | original video | DCT blocks |
+| bottom| quantized then dequantized DCT blocks | reconstructed video |
+
+> Recall that:
+> - a block is a 8x8 group of pixels.
+> - quantization refers to dividing the DCT block by the quantization matrix.
+
+Since the DCT blocks are being displayed in the YUV color space, values close to zero are an intense green. Note how the larger amount of green of the dequantized DCT blocks corresponds to the lower quality of the reconstructed video.
 
 The quality correlates with how fast you're mashing the keyboard. The background's intensity is a visual indicator for this. _You may need to increase the volume on your device to hear keymashing._
+
+![](media/JPEG%20Process.drawio.svg)
 
 Encoded macroblocks are inserted into a packet with the following metadata and then sent over the network.
 
