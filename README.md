@@ -130,7 +130,7 @@ Finally, the quantized block is run-length encoded in a zig-zag pattern. This ca
 
 You can observe the final outcome of this effect as a video:
 
-![](media/rickroll-keymash-compressed-with-audio.mp4)
+https://github.com/user-attachments/assets/489e3978-6acb-4a16-af49-40a0fb24831a
 
 The upper-left quadrant is the original video; the upper-left is the DCT blocks in the YUV color space (values close to zero in YUV look like an intense green).
 The bottom-left is the quantized then dequentized DCT blocks (note how the high-frequency components get zeroed out); the bottom-right is the reconstructed video.
