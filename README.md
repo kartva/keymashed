@@ -92,6 +92,10 @@ The webcam transmits video in the `YUV422` format. The [`YUV`](https://en.wikipe
 
 The `422` refers the [chroma subsamping](https://en.wikipedia.org/wiki/Chroma_subsampling), explained below.
 
+> Chroma subsampling is the practice of encoding images by implementing less resolution for chroma information than for luma information, taking advantage of the human visual system's lower acuity for color differences than for luminance.
+
+> -- Wikipedia
+
 ![](media/YUV422.drawio.svg)
 
 After receiving the video from the webcam, the video sender further subsamples the colors into 4:2:0.
@@ -108,15 +112,24 @@ The macroblock.
 
 The macroblock, decomposed into its six constituent blocks.
 
-Each block is encoded using the [DCT transform](https://en.wikipedia.org/wiki/Discrete_cosine_transform).
+Each block is converted to a frequency-domain representation using the [DCT transform](https://en.wikipedia.org/wiki/JPEG#Discrete_cosine_transform). The DCT transformed output makes the high-frequency and low-frequency components of the block more apparent.
 
-After the transformation, the values are divided element-wise by the _quantization matrix_, which is specially chosen to minimize perceptual quality loss.
+After the transformation, the values are divided element-wise by the _quantization matrix_, which is specially chosen to minimize perceptual quality loss. The quantization matrix can be scaled to increase/decrease image quality - this is the main knob that we use tune the lossy compression. Note how the lower-left elements of the quantization matrix are larger than the ones on the top-right; this prioritizes the lower-frequency components.
+
+<p float="left">
+  <img src="media/dct/original_8x8_block.svg" width="49%" /> 
+  <img src="media/dct/dct_of_block.svg" width="49%" />
+  <img src="media/dct/quantization_matrix.svg" width="49%" />
+  <img src="media/dct/quantized_dct_block.svg" width="49%" />
+  <img src="media/dct/reconstructed_block.svg" width="49%" />
+</p>
 
 Finally, the quantized block is run-length encoded in a zig-zag pattern. This causes zero values to end up at the end, which makes our naive encoding quite efficient on its own.
 
 ![](media/Zigzag.drawio.svg)
 
 Encoded macroblocks are inserted into a packet with the following metadata and then sent over the network.
+
 ```
 |---------------|
 |  Frame no.    |
