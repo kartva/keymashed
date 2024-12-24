@@ -82,7 +82,7 @@ int scream_bpf(struct __sk_buff *skb)
 The userspace code interacts with the eBPF filter using the `bpf_obj_get` and `bpf_map_update_elem` functions from `libbpf`.
 
 ### Real-time UDP streaming
-I decided to re-invent the Real-time protocol from scratch, with a focus on reduci90ng copies as much as possible. It makes heavy use of the `zerocopy` crate. The result is some rather complex Rust code that I'm quite happy with.
+I decided to re-invent the real-time protocol (RTP) from scratch, with a focus on reducing copies as much as possible. It makes heavy use of the `zerocopy` crate and const generics and supports `?Sized` types. The result is some rather complex Rust code that I'm quite happy with. Have a look at the [rtp module](rust-userspace/src/rtp.rs) if you're curious.
 
 ### Video Codec
 
@@ -127,6 +127,15 @@ After the transformation, the values are divided element-wise by the _quantizati
 Finally, the quantized block is run-length encoded in a zig-zag pattern. This causes zero values to end up at the end, which makes our naive encoding quite efficient on its own.
 
 ![](media/Zigzag.drawio.svg)
+
+You can observe the final outcome of this effect as a video:
+
+![](media/rickroll-keymash-compressed-with-audio.mp4)
+
+The upper-left quadrant is the original video; the upper-left is the DCT blocks in the YUV color space (values close to zero in YUV look like an intense green).
+The bottom-left is the quantized then dequentized DCT blocks (note how the high-frequency components get zeroed out); the bottom-right is the reconstructed video.
+
+The quality correlates with how fast you're mashing the keyboard. The background's intensity is a visual indicator for this. _You may need to increase the volume on your device to hear keymashing._
 
 Encoded macroblocks are inserted into a packet with the following metadata and then sent over the network.
 

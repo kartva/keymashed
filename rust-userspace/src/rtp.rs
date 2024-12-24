@@ -35,13 +35,14 @@ pub struct PacketHeader {
 #[derive(Debug, TryFromBytes, IntoBytes, KnownLayout, Immutable)]
 #[repr(C)]
 /// Represents a packet of data that is sent over the network.
-/// T is the type of data that is being sent. It must implement [`TryFromBytes`], [`IntoBytes`], [`KnownLayout`], and [`Immutable`] for efficient zero-copy ser/de.
+/// Payload is the type of data that is being sent. It must implement [`TryFromBytes`], [`IntoBytes`], [`KnownLayout`], and [`Immutable`] for efficient zero-copy ser/de.
 pub struct Packet<Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized> {
     /// [`accept_thread`] relies on the presence and type of the sequence number field.
     pub header: PacketHeader,
     pub data: Payload,
 }
 
+/// Convenience function for the size of a packet with a given payload type.
 pub const fn size_of_packet<Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable>() -> usize {
     std::mem::size_of::<Packet<Payload>>()
 }
@@ -59,10 +60,12 @@ struct AlignedPacketBytes<
 {
     _phantom: PhantomData<Payload>,
     _align: [Packet<AlignPayloadTo>; 0], // align to the alignment of the packet
-    // TODO: statically assert that the alignment is correct
+    // TODO: statically assert that the alignment is correct - this is quite hard!
     inner: [u8; size_of_packet::<[u8; SLOT_SIZE]>()],
 }
 
+
+// A custom [`fmt::Debug`] impl since the auto-impl requires `AlignPayloadTo` to implement it.
 impl<
         Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized,
         AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable,
@@ -78,6 +81,7 @@ where
     }
 }
 
+// Implement deref and deref_mut for the aligned packet bytes.
 impl<
         Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized,
         AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable,
@@ -154,15 +158,21 @@ pub struct RtpCircularBuffer<
     [(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized,
 {
     /// The sequence number of the earliest packet in the buffer.
+    /// External users can fetch this through [`RtpCircularBuffer::earliest_seq`].
     earliest_seq: u32,
     /// The span of the earliest sequence number and the latest sequence number of a received packet in the buffer.
     /// This can relied on as a hint for how full the buffer is. (i.e. how ahead is the latest received packet?)
+    /// External users can fetch this through [`RtpCircularBuffer::early_latest_span`].
     early_latest_span: u32,
     buf: Box<[MaybeInitPacket<Payload, AlignPayloadTo, SLOT_SIZE>; BUFFER_LENGTH]>,
 }
 
 /// A packet that has been received and is ready to be consumed.
-/// Holds a reference to the buffer it came from. When dropped, the packet is consumed and deleted.
+/// Holds a reference to the buffer it came from. When dropped,
+/// the packet is consumed and deleted from the circular buffer.
+
+// This is a wrapper around a mutable reference to the circular buffer.
+// It exists for the custom [`Drop`] impl that consumes the packet.
 pub struct ReceivedPacket<
     'a,
     Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized,
@@ -182,6 +192,7 @@ impl<
 where
     [(); size_of_packet::<[u8; SLOT_SIZE]>()]: Sized,
 {
+    /// Get a reference to the packet data from the buffer.
     pub fn get_data(&self) -> Option<&Packet<Payload>> {
         let rtp_receiver = &self.0;
 
@@ -199,6 +210,7 @@ where
     }
 }
 
+// [`Drop`] impl for [`ReceivedPacket`] that consumes the packet.
 impl<
         Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable + ?Sized,
         AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable,
@@ -264,10 +276,13 @@ where
         self.get(self.earliest_seq).and_then(|p| p.get_data())
     }
 
+    /// The sequence number of the earliest packet in the buffer.
     pub fn earliest_seq(&self) -> u32 {
         self.earliest_seq
     }
 
+    /// The span of the earliest sequence number and the latest sequence number of a received packet in the buffer.
+    /// This can relied on as a hint for how full the buffer is. (i.e. how ahead is the latest received packet?)
     pub fn early_latest_span(&self) -> u32 {
         self.early_latest_span
     }
@@ -283,6 +298,7 @@ where
         }
     }
 
+    /// See [`RtpCircularBuffer::get`].
     fn get_mut(
         &mut self,
         seq_num: u32,
@@ -296,15 +312,24 @@ where
     }
 }
 
+/// An RTP sender that sends packets over the network, specialized for a `Sized` payload.
 pub type RtpSizedPayloadSender<Payload: TryFromBytes + IntoBytes + Immutable + KnownLayout> =
     RtpSender<Payload, Payload, { size_of::<Payload>() }>;
 
+/// An RTP sender that sends packets over the network, specialized for a `[T]` payload.
+/// Arguments:
+/// - `SlicedPayload`: The type of the data that is being sent.
+/// - `MAX_SLICE_LENGTH`: The maximum number of elements in the slice.
 pub type RtpSlicePayloadSender<
     SlicedPayload: TryFromBytes + IntoBytes + Immutable + KnownLayout,
     const MAX_SLICE_LENGTH: usize,
 > = RtpSender<[SlicedPayload], SlicedPayload, { size_of::<SlicedPayload>() * MAX_SLICE_LENGTH }>;
 
 /// An RTP sender that sends packets over the network.
+/// Arguments:
+/// - `Payload`: The type of the data that is being sent.
+/// - `AlignPayloadTo`: The type that has the correct alignment for the payload.
+/// - `SLOT_SIZE`: The size of the payload data in bytes. This size is exclusive of packet metadata.
 pub struct RtpSender<
     Payload: TryFromBytes + IntoBytes + Immutable + KnownLayout + ?Sized,
     AlignPayloadTo: TryFromBytes + IntoBytes + KnownLayout + Immutable,
@@ -411,11 +436,20 @@ pub struct RtpReceiver<
     rtp_circular_buffer: Arc<Mutex<RtpCircularBuffer<Payload, AlignPayloadTo, SLOT_SIZE, BUFFER_LENGTH>>>,
 }
 
+/// An RTP receiver that recieves packets over the network, specialized for a `Sized` payload.
+/// Arguments:
+/// - `Payload`: The type of the data that is being sent.
+/// - `BUFFER_LENGTH`: The number of packets that can be stored in the buffer.
 pub type RtpSizedPayloadReceiver<
     Payload: TryFromBytes + IntoBytes + KnownLayout + Immutable,
     const BUFFER_LENGTH: usize,
 > = RtpReceiver<Payload, Payload, { size_of::<Payload>() }, BUFFER_LENGTH>;
 
+/// An RTP receiver that recieves packets over the network, specialized for a `[T]` payload.
+/// Arguments:
+/// - `SlicedPayload`: The type of the data that is being sent.
+/// - `MAX_SLICE_LENGTH`: The maximum number of elements in the slice.
+/// - `BUFFER_LENGTH`: The number of packets that can be stored in the buffer.
 pub type RtpSlicePayloadReceiver<
     SlicedPayload: TryFromBytes + IntoBytes + KnownLayout + Immutable,
     const MAX_SLICE_LENGTH: usize,
@@ -474,13 +508,14 @@ fn accept_thread<
 
     loop {
         // wait until socket has a packet to read
-        let mut seq_num_buffer = [0u8; 4];
+        // an unaligned buffer here is safe since [`PacketHeader`] implements [`Unaligned`].
+        let mut seq_num_buffer = [0u8; size_of::<PacketHeader>()];
         sock.peek(&mut seq_num_buffer).unwrap();
 
         // we have available data to read
         let mut state = recv.lock().unwrap();
 
-        let seq_num: u32 = U32::from_bytes(seq_num_buffer).into();
+        let seq_num: u32 = PacketHeader::ref_from_bytes(&seq_num_buffer).unwrap().sequence_number.into();
 
         // If the received packet has a place in the buffer, write the packet to the correct slot.
         // The received packet is allowed a place if its sequence number is larger than the earliest packet
@@ -501,10 +536,13 @@ fn accept_thread<
                 }
             }
 
+            // check whether we can update early_latest_span
             state.early_latest_span = u32::max(
                 state.early_latest_span,
                 seq_num.wrapping_sub(state.earliest_seq),
             );
+
+            // Receive packet into the correct slot.
             let MaybeInitPacket {
                 recv_size: init,
                 packet,
