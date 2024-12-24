@@ -86,7 +86,7 @@ I decided to re-invent the real-time protocol (RTP) from scratch, with a focus o
 
 An example of video playback with heavy packet loss (intensity of background ∝ packet loss):
 
-![](media/rickroll-keymashed-packet-loss.mp4)
+https://github.com/user-attachments/assets/766d756a-1409-4f98-a055-338dbd613f82
 
 Lost packers are not painted for a frame, resulting in newer frames being partially painted over older ones. This causes the glitchy effect.
 
