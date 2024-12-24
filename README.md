@@ -84,13 +84,19 @@ The userspace code interacts with the eBPF filter using the `bpf_obj_get` and `b
 ### Real-time UDP streaming
 I decided to re-invent the real-time protocol (RTP) from scratch, with a focus on reducing copies as much as possible. It makes heavy use of the `zerocopy` crate and const generics and supports `?Sized` types. The result is some rather complex Rust code that I'm quite happy with. Have a look at the [rtp module](rust-userspace/src/rtp.rs) if you're curious.
 
+An example of video playback with heavy packet loss (intensity of background ∝ packet loss):
+
+![](media/rickroll-keymashed-packet-loss.mp4)
+
+Lost packers are not painted for a frame, resulting in newer frames being partially painted over older ones. This causes the glitchy effect.
+
 ### Video Codec
 
 The webcam transmits video in the `YUV422` format. The [`YUV`](https://en.wikipedia.org/wiki/YCbCr) format is an alternative to the more well-known `RGB` format; it encodes the luminance (`Y`), blue-difference chroma (`Cb`/`U`) and red-difference chroma (`Cr`/`V`).
 
 ![A group of pixels 2 tall and 4 wide.](media/YUV444.drawio.svg)
 
-The `422` refers the [chroma subsamping](https://en.wikipedia.org/wiki/Chroma_subsampling), explained below.
+The `422` refers the [chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling), explained below.
 
 > Chroma subsampling is the practice of encoding images by implementing less resolution for chroma information than for luma information, taking advantage of the human visual system's lower acuity for color differences than for luminance.
 
@@ -150,7 +156,7 @@ Since the DCT blocks are being displayed in the YUV color space, values close to
 
 The quality correlates with how fast you're mashing the keyboard. The background's intensity is a visual indicator for this. _You may need to increase the volume on your device to hear keymashing._
 
-![](media/JPEG%20Process.drawio.svg)
+![](media/JPEG%20Process.drawio.png)
 
 Encoded macroblocks are inserted into a packet with the following metadata and then sent over the network.
 
