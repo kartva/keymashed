@@ -5,7 +5,7 @@ use std::{
 
 use libbpf_sys::{bpf_obj_get, BPF_ANY};
 
-const BPF_MAP_NAME: &CStr = c"/sys/fs/bpf/tc/globals/map_scream";
+const BPF_MAP_NAME: &CStr = c"/sys/fs/bpf/tc/globals/map_keymash";
 
 #[derive(Debug)]
 pub struct BpfHandle {

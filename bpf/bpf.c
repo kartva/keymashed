@@ -19,24 +19,23 @@
  */
 
 struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__uint(key_size, sizeof(uint32_t)); 
-	__uint(value_size, sizeof(uint32_t));
-	__uint(max_entries, 1);
-	__uint(pinning, LIBBPF_PIN_BY_NAME);	/* or LIBBPF_PIN_NONE */ // PIN_BY_NAME ensures that the map is pinned in /sys/fs/bpf
-} map_scream __section(".maps"); // synchronize this map name with userspace program
+    // declare that the bpf map will be of type array, mapping uint32_t to uint32_t and have a maximum of one entry.
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __uint(key_size, sizeof(uint32_t)); 
+    __uint(value_size, sizeof(uint32_t));
+    __uint(max_entries, 1);
+    // PIN_BY_NAME ensures that the map is pinned in /sys/fs/bpf
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    // synchronize the `map_keymash` name with the userspace program
+} map_keymash __section(".maps");
 
 __section("classifier")
 int scream_bpf(struct __sk_buff *skb)
 {
     uint32_t key = 0, *val = 0;
 
-	val = map_lookup_elem(&map_scream, &key);
-    int prob_frac = UINT32_MAX / 7; // by default, 15% packet loss
-	if (val)
-		prob_frac = *val;
-
-    if (get_prandom_u32() < prob_frac) {
+    val = map_lookup_elem(&map_keymash, &key);
+    if (val && get_prandom_u32() < *val) {
         return TC_ACT_SHOT; // Drop packet
     }
     return TC_ACT_OK; // Pass packet
