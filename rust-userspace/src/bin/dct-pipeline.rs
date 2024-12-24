@@ -1,10 +1,10 @@
 use core::f64;
 use rayon::prelude::*;
-use run_louder::video::{
+use run_louder::{video::{
     dct::dct2d, dequantize_macroblock, quantize_macroblock, Macroblock, MacroblockWithPosition,
     MutableYUVFrame, YUVFrame, YUVFrameMacroblockIterator, YUYV422Sample,
-};
-use sdl2::{pixels::PixelFormatEnum, rect::Rect};
+}, wpm};
+use sdl2::{pixels::{Color, PixelFormatEnum}, rect::Rect};
 use std::{path::Path, sync::Mutex, time::Duration};
 use zerocopy::IntoBytes;
 
@@ -105,16 +105,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     let mut event_pump = sdl_context.event_pump()?;
+
+    let mut typing_metrics = wpm::TypingMetrics::new();
     let mut frame_buf = Vec::with_capacity(video_width as usize * video_height as usize * 2);
     'running: loop {
         let start_time = std::time::Instant::now();
 
         for event in event_pump.poll_iter() {
             match event {
-                sdl2::event::Event::Quit { .. } => break 'running,
+                sdl2::event::Event::Quit {..} => return Ok(()),
+                sdl2::event::Event::KeyDown { keycode, repeat: false, timestamp: _, .. } => {
+                    match keycode {
+                        Some(k) => {
+                            let ik = k.into_i32();
+                            typing_metrics.receive_char_stroke(ik);
+                        },
+                        _ => {}
+                    }
+                },
                 _ => {}
             }
         }
+
+        let wpm = typing_metrics.calc_wpm();
+        log::info!("WPM: {}", wpm);
+
+        let quality = wpm::wpm_to_jpeg_quality(wpm);
+
+        canvas.set_draw_color(wpm::wpm_to_sdl_color(wpm, Color::RED));
+        canvas.clear();
 
         let frame = match decoder.decode_raw() {
             Ok(f) => f,
@@ -233,9 +252,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .par_bridge()
                     .into_par_iter()
                     .map(|MacroblockWithPosition { block, x, y }| {
-                        let quality =
-                            calculate_quality(x, y, video_width as usize, video_height as usize);
-
                         let quantized_block = quantize_macroblock(&block, quality);
                         let output_macroblock = Macroblock {
                             y0: quantized_block.y0.map(|row| row.map(|val| val as u8)),
@@ -271,8 +287,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .par_bridge()
                     .into_par_iter()
                     .map(|MacroblockWithPosition { block, x, y }| {
-                        let quality =
-                            calculate_quality(x, y, video_width as usize, video_height as usize);
+                        // let quality =
+                        //     calculate_quality(x, y, video_width as usize, video_height as usize);
 
                         let quantized_block = quantize_macroblock(&block, quality);
                         let dequantized_block = dequantize_macroblock(&quantized_block, quality);
