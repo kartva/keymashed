@@ -99,7 +99,7 @@ The webcam transmits video in the `YUV422` format. The [`YUV`](https://en.wikipe
 The `422` refers the [chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling), explained below.
 
 > Chroma subsampling is the practice of encoding images by implementing less resolution for chroma information than for luma information, taking advantage of the human visual system's lower acuity for color differences than for luminance.
-
+>
 > -- Wikipedia
 
 ![](media/YUV422.drawio.svg)
