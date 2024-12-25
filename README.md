@@ -18,35 +18,33 @@ _What if... you could motivate it. Make the internet itself flow a lil' quicker.
 
 https://github.com/user-attachments/assets/f13cbadf-bcb7-433d-a5de-5e4c0cf470ff
 
+## ✨the keymashed experience✨:
+_You walk up to the exhibit. There's a keyboard in front of you. The pedestal says, "Mash the keyboard". There are indistinct splotches of grey on the screen that may or may not be people standing around. As you start mashing, the image gains quality and smoothness. The edges of the screen glow a bright green to indicate you're close to the peak. The image resolves into a birds-eye view of the pedestal. In the screen, you see yourself starting to approach the exhibit._
+
 ## The Exhibit
 
 Keymashed as an exhibit consisted of:
 - An IBM Model-M keyboard with exquisite mash-feel.
 - An old square monitor.
-- Two Dell Optiplexes (cheap desktop computers) that are connected to the monitor and webcam. They communicate with each other over the internet.
+- Two Dell Optiplexes (cheap desktop computers) that are connected to the monitor and webcam respectively.
 
 There are two effects at play:
-- UDP packets are being dropped on the livestream playing computer at the network interface level. The more keys you mash, the less packets are lost. At the threshold, packet loss stops occurring.
-- Frames are being encoded lossily on the livestream sender computer. The more keys you mash, the lower the lossy compression. At the threshold, the image becomes clear without any color banding.
-
-The livestream is delayed by 30 seconds, since it's more interesting to see a bit into the past rather than just looking at your own back.
-
-All of this combines to create the:
-
-## ✨the keymashed experience✨:
-_You walk up to the exhibit. There's a keyboard in front of you. The pedestal says, "Mash the keyboard". There are indistinct splotches of grey on the screen that may or may not be people standing around. As you start mashing, the image gains quality and smoothness. The edges of the screen glow a bright green to indicate you're close to the peak. The image resolves into a birds-eye view of the pedestal. In the screen, you see yourself starting to approach the exhibit._
+- _Packet loss:_ UDP packets are being dropped on the livestream playing computer at the network interface level. The more keys you mash, the less packets are lost. At the threshold, packet loss stops occurring.
+- _Lossy compression:_ Frames are being encoded lossily on the livestream sender computer. The more keys you mash, the lower the lossy compression. At the threshold, the image becomes clear without any color banding.
 
 The webcam is mounted on top of a wall along with an Optiplex with a wireless dongle. This is the sender computer. The receiver computer sits under the pedestal that holds the monitor.
 <img src="media/BURST 2024 suspiciously-optiplex shaped box.jpg" />
 
-## Technical Details (and repository map)
+The livestream is delayed by 30 seconds, since it's more interesting to see a bit into the past rather than just looking at your own back.
 
-<TODO: This section is still under construction>
+## Technical Details (and repository map)
 
 The repository consists of the following components:
 - an eBPF filter written in C that drops packets with some probability that it reads from a shared map. This eBPF filter is installed onto the a network interface using the `tc` utility.
 - a video codec which uses a JPEG-like scheme to lossily compress blocks of frames which are then reassembled and decompressed on the receiver. The quality of the JPEG encoding can vary per block.
 - an RTP-like protocol for receiving packets over UDP.
+
+Explanations of each component follow.
 
 ### eBPF component
 
@@ -82,7 +80,9 @@ int scream_bpf(struct __sk_buff *skb)
 The userspace code interacts with the eBPF filter using the `bpf_obj_get` and `bpf_map_update_elem` functions from `libbpf`.
 
 ### Real-time UDP streaming
-I decided to re-invent the real-time protocol (RTP) from scratch, with a focus on reducing copies as much as possible. It makes heavy use of the `zerocopy` crate and const generics and supports `?Sized` types. The result is some rather complex Rust code that I'm quite happy with. Have a look at the [rtp module](rust-userspace/src/rtp.rs) if you're curious.
+I decided to re-invent the real-time protocol (RTP) from scratch, with a focus on reducing copies as much as possible. It makes heavy use of the `zerocopy` crate and const generics and supports `?Sized` types. Have a look at the [rtp module](rust-userspace/src/rtp.rs) if you're curious - the code is well-commented if dense. High-level summary:
+- maintain a circular buffer with slots for packets, putting incomding packets into slots as received
+- consume one slot at a time which may or may not contain a packet (it may be lost/late). if a packet arrives after having been consumed (late), it will be discarded.
 
 An example of video playback with heavy packet loss (intensity of background ∝ packet loss):
 
@@ -197,3 +197,4 @@ _I'm looking for Summer 2025 internships._ Read more about my work at [my Github
 @9p4 helped a lot with initial ideation and prototyping.
 Poster design by Rebecca Pine and pixel art by Jadden Picardal.
 Most photos by Sebastian Murariu.
+@ArhanChaudhary for "ominously watching me code" and motivating me to do this from his [NAND computer project](https://github.com/ArhanChaudhary/NAND).
