@@ -40,7 +40,7 @@ The livestream is delayed by 30 seconds, since it's more interesting to see a bi
 ## Technical Details (and repository map)
 
 The repository consists of the following components:
-- an eBPF filter written in C that drops packets with some probability that it reads from a shared map. This eBPF filter is installed onto the a network interface using the `tc` utility.
+- an eBPF filter written in C that drops packets with some probability that it reads from a shared map. This eBPF filter is installed onto the network interface using the `tc` utility.
 - a video codec which uses a JPEG-like scheme to lossily compress blocks of frames which are then reassembled and decompressed on the receiver. The quality of the JPEG encoding can vary per block.
 - an RTP-like protocol for receiving packets over UDP.
 
