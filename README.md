@@ -102,13 +102,15 @@ The `422` refers the [chroma subsampling](https://en.wikipedia.org/wiki/Chroma_s
 >
 > -- Wikipedia
 
+In this case, instead of having independent `YUV` values for every pixel, we let two horizontal `Y` pixels share the `U` and `V` color values. This allows us to pack two pixels within four bytes (assuming 8 bits per component) instead of the usual six bytes, achieving compression of 2 bytes per pixel.
+
 ![](media/YUV422.drawio.svg)
 
-After receiving the video from the webcam, the video sender further subsamples the colors into 4:2:0.
+After receiving the video from the webcam, the video sender further subsamples the colors into 4:2:0. This increases our compression to 1.5 bytes per pixel.
 
 ![](media/YUV420.drawio.svg)
 
-The subsampled frame is then broken into _macroblocks_ of 16 x 16 pixels which contain six _blocks_ of 8 x 8 values: four for luminance, one for red-difference and one for blue-difference. (Note that a group of four pixels has six associated values).
+The subsampled frame is then broken into _macroblocks_ of 16 x 16 pixels which contain six _blocks_ of 8 x 8 values: four for luminance, one for red-difference and one for blue-difference.
 
 ![](media/Macroblock.drawio.svg)
 
