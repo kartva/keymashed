@@ -50,7 +50,7 @@ Explanations of each component follow.
 
 [eBPF](https://ebpf.io/) is a relatively recent feature in the Linux kernel which allows running sandboxed user-provided code in the kernel inside a virtual machine. It is used in [many kernel subsystems which deal with security, tracing and networking](https://docs.ebpf.io/linux/program-type/).
 
-We create an eBPF filter in [bpf.c](bpf/bpf.c) which reads the drop probability from a file which user programs can write to and then decides whether to drop the current packet or not. This eBPF filter is installed at a network interface using the `tc` (traffic control) utility.
+We create an eBPF filter in [bpf.c](bpf/bpf.c) which reads the drop probability from a file (which user programs can write to) and then decides whether to drop the current packet or not. This eBPF filter is installed at a network interface using the `tc` (traffic control) utility.
 
 ```c
 struct {
@@ -77,12 +77,14 @@ int scream_bpf(struct __sk_buff *skb)
 }
 ```
 
-The userspace code interacts with the eBPF filter using the `bpf_obj_get` and `bpf_map_update_elem` functions from `libbpf`.
+The [userspace code](rust-userspace/src/bpf.rs) interacts with the eBPF filter using the `bpf_obj_get` and `bpf_map_update_elem` functions from `libbpf`.
 
 ### Real-time UDP streaming
-I decided to re-invent the real-time protocol (RTP) from scratch, with a focus on reducing copies as much as possible. It makes heavy use of the `zerocopy` crate and const generics and supports `?Sized` types. Have a look at the [rtp module](rust-userspace/src/rtp.rs) if you're curious - the code is well-commented if dense. High-level summary:
-- maintain a circular buffer with slots for packets, putting incomding packets into slots as received
-- consume one slot at a time which may or may not contain a packet (it may be lost/late). if a packet arrives after having been consumed (late), it will be discarded.
+[UDP is the user-datagram protocol](https://en.wikipedia.org/wiki/User_Datagram_Protocol), commonly used for multimedia streaming applications due to its packet-oriented and unreliable nature. The real-time protocol (RTP) is built on top of UDP.
+
+I decided to re-invent the real-time protocol (RTP) from scratch, with a focus on reducing copies as much as possible. It makes heavy use of the [`zerocopy`](https://github.com/google/zerocopy) crate and const generics and supports `?Sized` types. Have a look at the [rtp module](rust-userspace/src/rtp.rs) if you're curious - the code is well-commented if dense. High-level summary:
+- maintain a circular buffer with slots for packets, putting incoming packets into slots as received
+- consume one slot at a time which may or may not contain a packet (it may be lost/late). If a packet arrives after having been consumed (late), it will be discarded.
 
 An example of video playback with heavy packet loss (intensity of background <big>∝</big> packet loss):
 
@@ -94,7 +96,7 @@ Lost packets are not painted for a frame, resulting in newer frames being partia
 
 The webcam transmits video in the `YUV422` format. The [`YUV`](https://en.wikipedia.org/wiki/YCbCr) format is an alternative to the more well-known `RGB` format; it encodes the luminance (`Y`), blue-difference chroma (`Cb`/`U`) and red-difference chroma (`Cr`/`V`).
 
-![A group of pixels 2 tall and 4 wide.](media/YUV444.drawio.svg)
+![A 2 high and 4 wide grid of three overlaid boxes colored white, blue and red.](media/YUV444.drawio.svg)
 
 The `422` refers the [chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling), explained below.
 
@@ -104,11 +106,11 @@ The `422` refers the [chroma subsampling](https://en.wikipedia.org/wiki/Chroma_s
 
 In this case, instead of having independent `YUV` values for every pixel, we let two horizontal `Y` pixels share the `U` and `V` color values. This allows us to pack two pixels within four bytes (assuming 8 bits per component) instead of the usual six bytes, achieving compression of 2 bytes per pixel.
 
-![](media/YUV422.drawio.svg)
+![A 2 high and 4 wide grid where two adjacent cells share a red and green box and each cell contains a white box](media/YUV422.drawio.svg)
 
 After receiving the video from the webcam, the video sender further subsamples the colors into 4:2:0. This increases our compression to 1.5 bytes per pixel.
 
-![](media/YUV420.drawio.svg)
+![A 2 high and 4 wide grid where each cell contains a white box. Overlapping red and blue boxes are present at the points where four cells touch.](media/YUV420.drawio.svg)
 
 The subsampled frame is then broken into _macroblocks_ of 16 x 16 pixels which contain six _blocks_ of 8 x 8 values: four for luminance, one for red-difference and one for blue-difference.
 
