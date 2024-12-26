@@ -220,7 +220,7 @@ As an extension to this idea, I started working on affecting the network as well
 If you have ideas around making `screamd`, please contact me or create an issue!
 
 # About the author / hire me!
-_I'm looking for Summer 2025 internships - and I'n particularly excited about working with startups._ Read more about my work at [my Github profile](https://github.com/kartva/).
+_I'm looking for Summer 2025 internships - and I'm particularly excited about working with startups._ Read more about my work at [my Github profile](https://github.com/kartva/).
 
 # Credits
 
