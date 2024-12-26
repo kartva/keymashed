@@ -188,6 +188,10 @@ Putting both effects together, this is a demo of what the output looks like:
 
 https://github.com/user-attachments/assets/cc3fd479-7786-4c24-bc81-64d4656eac57
 
+A diagram of the network setup:
+
+![](media/Architecture.drawio.png)
+
 ## Project Evolution
 
 "what if you could scream at your computer to make it run faster?" was the original question I asked. We ([@kartva](https://github.com/kartva/) and [@9p4](https://github.com/9p4)) wrote `run-louder`/`screamd` (we went through many names) which would spawn a child process, say Google Chrome, and intercept all syscalls made by it using `ptrace` (the same syscall that `gdb` uses). After intercepting a syscall, the parent would sleep for some time (proportional to scream intensity) before resuming the child.
