@@ -181,8 +181,12 @@ Encoded macroblocks are inserted into a packet with the following metadata and t
 |      ...      |
 ```
 
-### User-level application
+### User-level Application
 The application itself uses `SDL2` for handling key input and rendering the video.
+
+Putting both effects together, this is a demo of what the output looks like:
+
+https://github.com/user-attachments/assets/cc3fd479-7786-4c24-bc81-64d4656eac57
 
 ## Project Evolution
 
