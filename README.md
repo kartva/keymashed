@@ -11,8 +11,8 @@ _What if... you could motivate it. Make the internet itself flow a lil' quicker.
   - [Gallery](#gallery)
   - [✨the keymashed experience✨:](#the-keymashed-experience)
   - [The Exhibit](#the-exhibit)
-  - [Technical Details](#technical-details-and-repository-map)
-    - [eBPF component](#ebpf-component)
+  - [Technical Details](#technical-details)
+    - [eBPF Packet Filter](#ebpf-packet-filter)
     - [Real-time UDP streaming](#real-time-udp-streaming)
     - [Video Codec](#video-codec)
     - [User-level Application](#user-level-application)
@@ -60,7 +60,7 @@ The repository consists of the following components:
 
 Explanations of each component follow.
 
-### eBPF component
+### eBPF Packet Filter
 
 [eBPF](https://ebpf.io/) is a relatively recent feature in the Linux kernel which allows running sandboxed user-provided code in the kernel inside a virtual machine. It is used in [many kernel subsystems which deal with security, tracing and networking](https://docs.ebpf.io/linux/program-type/).
 
@@ -99,12 +99,14 @@ The [userspace code](rust-userspace/src/bpf.rs) interacts with the eBPF filter u
 I decided to re-invent the real-time protocol (RTP) from scratch, with a focus on reducing copies as much as possible. It makes heavy use of the [`zerocopy`](https://github.com/google/zerocopy) crate and const generics and supports `?Sized` types. Have a look at the [rtp module](rust-userspace/src/rtp.rs) if you're curious - the code is well-commented if dense. High-level summary:
 - maintain a circular buffer with slots for packets, putting incoming packets into slots as received
 - consume one slot at a time which may or may not contain a packet (it may be lost/late). If a packet arrives after having been consumed (late), it will be discarded.
+- if the sender lags behind in sending packets, the receiver can wait if the "early-latest" span is too low. The early-latest span measures the difference between the latest received packet number and the packet that will be consumed next.
+- if the receiver lags behind in consuming packets, earlier packets are overwritten with new ones. The receiver can jump ahead to start playing the new packets when it arrives at that section.
 
 An example of video playback with heavy packet loss (intensity of background <big>∝</big> packet loss):
 
 https://github.com/user-attachments/assets/766d756a-1409-4f98-a055-338dbd613f82
 
-Lost packets are not painted for a frame, resulting in newer frames being partially painted over older ones. This causes the glitchy effect.
+Lost packets are not painted for a frame, resulting in newer frames being partially painted over older ones. This causes the glitchy effect. The long strips are a consequence of the packetization strategy, which is explored towards the end of the next section.
 
 ### Video Codec
 
@@ -141,11 +143,11 @@ Each block is converted to a frequency-domain representation using the [DCT tran
 After the transformation, the values are divided element-wise by the _quantization matrix_, which is specially chosen to minimize perceptual quality loss. The quantization matrix can be scaled to increase/decrease image quality - this is the main knob that we use tune the lossy compression. Note how the lower-left elements of the quantization matrix are larger than the ones on the top-right; this prioritizes the lower-frequency components.
 
 <p float="left">
-  <img src="media/dct/original_8x8_block.svg" width="49%" /> 
-  <img src="media/dct/dct_of_block.svg" width="49%" />
-  <img src="media/dct/quantization_matrix.svg" width="49%" />
-  <img src="media/dct/quantized_dct_block.svg" width="49%" />
-  <img src="media/dct/reconstructed_block.svg" width="49%" />
+  <img src="media/dct/original_8x8_block.svg" width="32%" /> 
+  <img src="media/dct/dct_of_block.svg" width="32%" />
+  <img src="media/dct/quantization_matrix.svg" width="32%" />
+  <img src="media/dct/quantized_dct_block.svg" width="32%" />
+  <img src="media/dct/reconstructed_block.svg" width="32%" />
 </p>
 
 Finally, the quantized block is run-length encoded in a zig-zag pattern. This causes zero values to end up at the end, which makes our naive encoding quite efficient on its own.
@@ -157,9 +159,9 @@ Run-length encoding encodes a stream of data as pairs of (value, count) where co
 And so [54, 23, 23, 1, 1, 1, 0, 0, 0, ... 23 more times ...] gets encoded as [(54, 1), (23, 2), (1, 3), (0, 26), ...] which is quite efficient.
 ```
 
-I'd like to make a quick note that I did some performance optimization and parallelization to get this running as smoothly as it does - shoutout to [`cargo-flamegraph`](https://github.com/flamegraph-rs/flamegraph)!
+I did some performance optimization and parallelization using [`rayon`](https://github.com/rayon-rs/rayon) to get this running as smoothly as it does - shoutout to [`cargo-flamegraph`](https://github.com/flamegraph-rs/flamegraph)!
 
-You can observe the final outcome of this effect as a video:
+You can observe the final outcome of this lossy compression as a video:
 
 https://github.com/user-attachments/assets/489e3978-6acb-4a16-af49-40a0fb24831a
 
@@ -195,10 +197,12 @@ Encoded macroblocks are inserted into a packet with the following metadata and t
 |      ...      |
 ```
 
+Note that these macroblocks are greedily packet into a single UDP packet. The packetizing logic tends to put in adjacent macroblocks together, which means that a packet being lost results in a long strip of macroblocks not being updated that frame.
+
 ### User-level Application
 The application itself uses `SDL2` for handling key input and rendering the video.
 
-Putting both effects together, this is a demo of what the output looks like:
+Putting both effects together, a demo of what the output looks like follows. _Turn up your volume to hear the keymashing._
 
 https://github.com/user-attachments/assets/cc3fd479-7786-4c24-bc81-64d4656eac57
 
