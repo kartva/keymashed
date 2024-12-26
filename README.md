@@ -84,11 +84,11 @@ I decided to re-invent the real-time protocol (RTP) from scratch, with a focus o
 - maintain a circular buffer with slots for packets, putting incomding packets into slots as received
 - consume one slot at a time which may or may not contain a packet (it may be lost/late). if a packet arrives after having been consumed (late), it will be discarded.
 
-An example of video playback with heavy packet loss (intensity of background ∝ packet loss):
+An example of video playback with heavy packet loss (intensity of background <big>∝</big> packet loss):
 
 https://github.com/user-attachments/assets/766d756a-1409-4f98-a055-338dbd613f82
 
-Lost packers are not painted for a frame, resulting in newer frames being partially painted over older ones. This causes the glitchy effect.
+Lost packets are not painted for a frame, resulting in newer frames being partially painted over older ones. This causes the glitchy effect.
 
 ### Video Codec
 
@@ -120,7 +120,7 @@ The macroblock.
 
 The macroblock, decomposed into its six constituent blocks.
 
-Each block is converted to a frequency-domain representation using the [DCT transform](https://en.wikipedia.org/wiki/JPEG#Discrete_cosine_transform). The DCT transformed output makes the high-frequency and low-frequency components of the block more apparent.
+Each block is converted to a frequency-domain representation using the [DCT transform](https://en.wikipedia.org/wiki/JPEG#Discrete_cosine_transform). The DCT-transformed output makes the high-frequency and low-frequency components of the block more apparent.
 
 After the transformation, the values are divided element-wise by the _quantization matrix_, which is specially chosen to minimize perceptual quality loss. The quantization matrix can be scaled to increase/decrease image quality - this is the main knob that we use tune the lossy compression. Note how the lower-left elements of the quantization matrix are larger than the ones on the top-right; this prioritizes the lower-frequency components.
 
@@ -140,6 +140,8 @@ Run-length encoding encodes a stream of data as pairs of (value, count) where co
 ```
 And so [54, 23, 23, 1, 1, 1, 0, 0, 0, ... 23 more times ...] gets encoded as [(54, 1), (23, 2), (1, 3), (0, 26), ...] which is quite efficient.
 ```
+
+I'd like to make a quick note that I did some performance optimization and parallelization to get this running as smoothly as it does - shoutout to [`cargo-flamegraph`](https://github.com/flamegraph-rs/flamegraph)!
 
 You can observe the final outcome of this effect as a video:
 
@@ -182,7 +184,7 @@ The application itself uses `SDL2` for handling key input and rendering the vide
 
 ## Project Evolution
 
-"what if you could scream at your computer to make it run faster?" was the original question I asked. We (@kartva and @9p4) wrote `run-louder`/`screamd` (we went through many names) which would spawn a child process, say Google Chrome, and intercept all syscalls made by it using `ptrace` (the same syscall that `gdb` uses). After intercepting a syscall, the parent would sleep for some time (proportional to scream intensity) before resuming the child.
+"what if you could scream at your computer to make it run faster?" was the original question I asked. We ([@kartva](https://github.com/kartva/) and [@9p4](https://github.com/9p4)) wrote `run-louder`/`screamd` (we went through many names) which would spawn a child process, say Google Chrome, and intercept all syscalls made by it using `ptrace` (the same syscall that `gdb` uses). After intercepting a syscall, the parent would sleep for some time (proportional to scream intensity) before resuming the child.
 
 We demoed it and have a shaky video of:
 - trying to open Chrome but it's stuck loading
@@ -191,12 +193,14 @@ We demoed it and have a shaky video of:
 
 As an extension to this idea, I started working on affecting the network as well by dropping packets. At this point, I decided to present `run-louder`/`screamd` at BURST, which necessitated changing screaming to key-mashing (out of respect for the art gallery setting). Additionally, while `ping` works fine as a method of demoing packet loss, I wanted something more visual and thus ended up writing the video codec.
 
+If you have ideas around making `screamd`, please contact me or create an issue!
+
 # About the author / hire me!
 _I'm looking for Summer 2025 internships._ Read more about my work at [my Github profile](https://github.com/kartva/).
 
 # Credits
 
-@9p4 helped a lot with initial ideation and prototyping.
+[@9p4](https://github.com/9p4) helped a lot with initial ideation and prototyping.
 Poster design by Rebecca Pine and pixel art by Jadden Picardal.
 Most photos by Sebastian Murariu.
-@ArhanChaudhary for "ominously watching me code" and motivating me to do this from his [NAND computer project](https://github.com/ArhanChaudhary/NAND).
+[@ArhanChaudhary](https://github.com/ArhanChaudhary) for "ominously watching me code" and motivating me to do this from his [NAND computer project](https://github.com/ArhanChaudhary/NAND).
