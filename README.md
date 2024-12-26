@@ -7,6 +7,20 @@ _What if... you could motivate it. Make the internet itself flow a lil' quicker.
   <img align="right" src="https://github.com/user-attachments/assets/27412e69-7cbc-4a01-9383-3a5e2ed242dd" style="width:150px;">
   An interactive installation at <a href="https://burst.purduehackers.com/">Purdue Hackers' BURST</a>. Since making the internet faster is a hard research problem, <code>keymashed</code> instead settles for worsening the internet and then easing up on the impairment based on how fast you mash the keyboard. Observe the effects of your encouragement through a bad video protocol made for your enjoyment. Mash a variety of keys for best effect.
 
+## Table of contents:
+  - [Gallery](#gallery)
+  - [✨the keymashed experience✨:](#the-keymashed-experience)
+  - [The Exhibit](#the-exhibit)
+  - [Technical Details](#technical-details-and-repository-map)
+    - [eBPF component](#ebpf-component)
+    - [Real-time UDP streaming](#real-time-udp-streaming)
+    - [Video Codec](#video-codec)
+    - [User-level Application](#user-level-application)
+  - [Project Evolution](#project-evolution)
+- [About the author / hire me!](#about-the-author--hire-me)
+- [Credits](#credits)
+
+
 ## Gallery
 
 <p float="left">
@@ -37,7 +51,7 @@ The webcam is mounted on top of a wall along with an Optiplex with a wireless do
 
 The livestream is delayed by 30 seconds, since it's more interesting to see a bit into the past rather than just looking at your own back.
 
-## Technical Details (and repository map)
+## Technical Details
 
 The repository consists of the following components:
 - an eBPF filter written in C that drops packets with some probability that it reads from a shared map. This eBPF filter is installed onto the network interface using the `tc` utility.
@@ -188,7 +202,7 @@ Putting both effects together, this is a demo of what the output looks like:
 
 https://github.com/user-attachments/assets/cc3fd479-7786-4c24-bc81-64d4656eac57
 
-A diagram of the network setup:
+A diagram of the network setup (video processing steps elided):
 
 ![](media/Architecture.drawio.png)
 
