@@ -4,7 +4,7 @@ _What if... you could motivate it. Make the internet itself flow a lil' quicker.
 
 # Keymashed
 
-  <img align="right" src="https://github.com/user-attachments/assets/27412e69-7cbc-4a01-9383-3a5e2ed242dd" style="width:125px;">
+  <img align="right" src="https://github.com/user-attachments/assets/27412e69-7cbc-4a01-9383-3a5e2ed242dd" style="width:150px;">
   An interactive installation at <a href="https://burst.purduehackers.com/">Purdue Hackers' BURST</a>. Since making the internet faster is a hard research problem, <code>keymashed</code> instead settles for worsening the internet and then easing up on the impairment based on how fast you mash the keyboard. Observe the effects of your encouragement through a bad video protocol made for your enjoyment. Mash a variety of keys for best effect.
 
 ## Gallery
@@ -200,7 +200,8 @@ _I'm looking for Summer 2025 internships - and I'n particularly excited about wo
 
 # Credits
 
-[@9p4](https://github.com/9p4) helped a lot with initial ideation and prototyping.
-Poster design by Rebecca Pine and pixel art by Jadden Picardal.
-Most photos by Sebastian Murariu.
-[@ArhanChaudhary](https://github.com/ArhanChaudhary) for "ominously watching me code" and motivating me to do this from his [NAND computer project](https://github.com/ArhanChaudhary/NAND).
+- [@9p4](https://github.com/9p4) helped a lot with initial ideation and prototyping.
+- Poster design by Rebecca Pine and pixel art by Jadden Picardal.
+- Most photos by Sebastian Murariu.
+- [@ArhanChaudhary](https://github.com/ArhanChaudhary) for "ominously watching me code" and motivating me to do this from his [NAND computer project](https://github.com/ArhanChaudhary/NAND).
+- [@kdkasad](https://github.com/kdkasad) for interesting conversation and reviews of the readme.
