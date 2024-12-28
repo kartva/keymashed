@@ -229,7 +229,7 @@ _I'm looking for Summer 2025 internships - and I'm particularly excited about wo
 
 # Credits
 
-- [@9p4](https://github.com/9p4) helped a lot with initial ideation and prototyping.
+- [@9p4](https://github.com/9p4) helped a lot with initial ideation and prototyping, as well as creating the initial Zig version of `screamd`.
 - Poster design by Rebecca Pine and pixel art by Jadden Picardal.
 - Most photos by Sebastian Murariu.
 - [@ArhanChaudhary](https://github.com/ArhanChaudhary) for "ominously watching me code" and motivating me to do this from his [NAND computer project](https://github.com/ArhanChaudhary/NAND).
