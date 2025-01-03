@@ -263,7 +263,7 @@ mod fixed_fast_dct {
         for i in 0..8 {
             let mut column = [0.0; 8];
             for j in 0..8 {
-                column[j] = block[j][i] as f64;
+                column[j] = out[j][i];
             }
             transform(&mut column);
             for j in 0..8 {
@@ -274,23 +274,33 @@ mod fixed_fast_dct {
         out
     }
     pub fn inverse_dct2d(block: &[[f64; 8]; 8]) -> [[u8; 8]; 8] {
-        let mut out = [[0; 8]; 8];
+        let mut output = [[0.0; 8]; 8];
 
         // IDCT over columns
-        // I will not pretend to know why this code does not need the IDCT over rows as well.
-
         for i in 0..8 {
             let mut column = [0.0; 8];
             for j in 0..8 {
-                column[j] = block[j][i] as f64;
+                column[j] = block[j][i];
             }
             inverse_transform(&mut column);
             for j in 0..8 {
-                out[j][i] = column[j].round() as u8;
+                output[j][i] = column[j].round();
+            }
+        }
+        
+        // IDCT over rows
+        for i in 0..8 {
+            inverse_transform(&mut output[i]);
+        }
+
+        let mut rounded_output = [[0; 8]; 8];
+        for i in 0..8 {
+            for j in 0..8 {
+                rounded_output[i][j] = output[i][j].round() as u8;
             }
         }
 
-        out
+        rounded_output
     }
 }
 
@@ -316,7 +326,7 @@ mod test_dct {
 
         for i in 0..8 {
             for j in 0..8 {
-                assert!(inverse[i][j] - block[i][j] < 10);
+                assert!((inverse[i][j] as i32 - block[i][j] as i32).abs() < 10);
             }
         }
     }
