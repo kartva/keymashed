@@ -5,7 +5,7 @@ _What if... you could motivate it. Make the internet itself flow a lil' quicker.
 # Keymashed
 
   <img align="right" src="https://github.com/user-attachments/assets/27412e69-7cbc-4a01-9383-3a5e2ed242dd" style="width:150px;">
-  An <i>interactive art installation</i> at <a href="https://burst.purduehackers.com/">Purdue Hackers' BURST</a>. Since making the internet faster is a hard research problem, <code>keymashed</code> instead worsens the internet and then eases up proportional to how fast you mash the keyboard. Observe the fruits of your encouragement through a bad live-streaming video protocol.
+  An <i>interactive art installation</i> at <a href="https://burst.purduehackers.com/">Purdue Hackers' BURST end-of-semester show</a>. Since making the internet faster is a hard research problem, <code>keymashed</code> instead worsens the internet and then eases up proportional to how fast you mash the keyboard. Observe the fruits of your encouragement through a bad live-streaming video protocol.
 
 ## Table of contents:
   - [Gallery](#gallery)
