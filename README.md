@@ -5,15 +5,15 @@ _What if... you could motivate it. Make the internet itself flow a lil' quicker.
 # Keymashed
 
   <img align="right" src="https://github.com/user-attachments/assets/27412e69-7cbc-4a01-9383-3a5e2ed242dd" style="width:150px;">
-  An interactive installation at <a href="https://burst.purduehackers.com/">Purdue Hackers' BURST</a>. Since making the internet faster is a hard research problem, <code>keymashed</code> instead settles for worsening the internet and then easing up on the impairment based on how fast you mash the keyboard. Observe the effects of your encouragement through a bad video protocol made for your enjoyment. Mash a variety of keys for best effect.
+  An <i>interactive art installation</i> at <a href="https://burst.purduehackers.com/">Purdue Hackers' BURST</a>. Since making the internet faster is a hard research problem, <code>keymashed</code> instead worsens the internet and then eases up proportional to how fast you mash the keyboard. Observe the fruits of your encouragement through a bad live-streaming video protocol.
 
 ## Table of contents:
   - [Gallery](#gallery)
-  - [✨the keymashed experience✨:](#the-keymashed-experience)
+  - [✨the keymashed experience✨](#the-keymashed-experience)
   - [The Exhibit](#the-exhibit)
   - [Technical Details](#technical-details)
     - [eBPF Packet Filter](#ebpf-packet-filter)
-    - [Real-time UDP streaming](#real-time-udp-streaming)
+    - [Real-time UDP Streaming](#real-time-udp-streaming)
     - [Video Codec](#video-codec)
     - [User-level Application](#user-level-application)
   - [Project Evolution](#project-evolution)
