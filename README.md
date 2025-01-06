@@ -88,7 +88,7 @@ The [userspace code](rust-userspace/src/bpf.rs) interacts with the eBPF filter u
 ### Real-time UDP streaming
 [UDP is the user-datagram protocol](https://en.wikipedia.org/wiki/User_Datagram_Protocol), commonly used for multimedia streaming applications due to its packet-oriented and unreliable nature. The real-time protocol (RTP) is built on top of UDP.
 
-I decided to re-invent the real-time protocol (RTP) from scratch, with a focus on reducing copies as much as possible. It makes heavy use of the [`zerocopy`](https://github.com/google/zerocopy) crate and const generics and supports `?Sized` types. [Have a look at the rtp module](rust-userspace/src/rtp.rs) - the code is well-commented if dense. _It's probably the most ~~over~~-engineered part of the entire project._ High-level summary:
+I decided to re-invent the real-time protocol (RTP) from scratch, with a focus on reducing copies as much as possible. It makes heavy use of the [`zerocopy`](https://github.com/google/zerocopy) crate and const generics and supports `?Sized` types. [Have a look at the rtp module](rust-userspace/src/rtp.rs) - the code is dense but well-commented. _It's probably the most ~~over~~-engineered part of the entire project._ High-level summary:
 - each sent packet is assigned a sequence number.
 - on the receiver side, we maintain a circular buffer with slots for packets, putting incoming packets into slots as received.
 - the receiver consumes one slot at a time which may or may not contain a packet (it may be lost/late). If a packet arrives after having been consumed (late), it will be discarded.
