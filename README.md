@@ -1,14 +1,14 @@
+<img align="right" src="media/BURST 2024 SebMur-6-resized.jpg" width="40%" /> 
+
 _Ya know, how sometimes your computer's internet is slow?_
 
 _What if... you could motivate it. Make the internet itself flow a lil' quicker._
 
 # Keymashed
 
-  <img align="right" src="https://github.com/user-attachments/assets/27412e69-7cbc-4a01-9383-3a5e2ed242dd" style="width:150px;">
   An <i>interactive art installation</i> at <a href="https://burst.purduehackers.com/">Purdue Hackers' BURST fall 2024 show</a>. Since making the internet faster is a hard research problem, <code>keymashed</code> instead worsens the internet and then eases up proportional to how fast you mash the keyboard. Observe the fruits of your tactile encouragement through a custom live-streaming video protocol.
 
 ## Table of contents:
-  - [Gallery](#gallery)
   - [✨the keymashed experience✨](#the-keymashed-experience)
   - [The Exhibit](#the-exhibit)
   - [Technical Details](#technical-details)
@@ -17,22 +17,14 @@ _What if... you could motivate it. Make the internet itself flow a lil' quicker.
     - [Video Codec](#video-codec)
     - [User-level Application](#user-level-application)
   - [Project Evolution](#project-evolution)
+- [Gallery](#gallery)
 - [About the author / hire me!](#about-the-author--hire-me)
 - [Credits](#credits)
 
-
-## Gallery
-
-<p float="left">
-  <img src="media/BURST 2024 SebMur-6-resized.jpg" width="49%" /> 
-  <img src="media/BURST 2024 SebMur-19-resized.jpg" width="49%" />
-  <img src="media/BURST 2024 SebMur-82-cropped.jpg" width="49%" />
-  <img src="media/BURST 2024 SebMur-66-cropped.jpg" width="49%" />
-</p>
+## ✨the keymashed experience✨:
 
 https://github.com/user-attachments/assets/f13cbadf-bcb7-433d-a5de-5e4c0cf470ff
 
-## ✨the keymashed experience✨:
 _You walk up to the exhibit. There's a keyboard in front of you. The pedestal says, "Mash the keyboard". There are indistinct splotches of grey on the screen that may or may not be people standing around. As you start mashing, the image gains quality and smoothness. The edges of the screen glow a bright green to indicate you're close to the peak. The image resolves into a birds-eye view of the pedestal. In the screen, you see yourself starting to approach the exhibit._
 
 ## The Exhibit
@@ -223,6 +215,15 @@ We demoed it and have a shaky video of:
 As an extension to this idea, I started working on affecting the network as well by dropping packets. At this point, I decided to present `run-louder`/`screamd` at BURST, which necessitated changing screaming to key-mashing (out of respect for the art gallery setting). Additionally, while `ping` works fine as a method of demoing packet loss, I wanted something more visual and thus ended up writing the video codec.
 
 If you have ideas around making `screamd`, please contact me or create an issue!
+
+# Gallery
+
+<p float="left">
+  <img src="media/BURST 2024 SebMur-6-resized.jpg" width="49%" /> 
+  <img src="media/BURST 2024 SebMur-19-resized.jpg" width="49%" />
+  <img src="media/BURST 2024 SebMur-82-cropped.jpg" width="49%" />
+  <img src="media/BURST 2024 SebMur-66-cropped.jpg" width="49%" />
+</p>
 
 # About the author / hire me!
 _I'm looking for Summer 2025 internships - and I'm particularly excited about working with startups._ Read more about my work at [my Github profile](https://github.com/kartva/).
