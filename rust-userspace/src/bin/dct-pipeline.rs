@@ -1,6 +1,12 @@
+// ----------------------------------------------------------------------------
+// WARNING:
+// Documentation for this code is poor. This code is meant to demonstrate the
+// various stages of the lossy compression pipeline.
+// ----------------------------------------------------------------------------
+
 use core::f64;
 use rayon::prelude::*;
-use run_louder::{video::{
+use rust_userspace::{video::{
     dct::dct2d, dequantize_macroblock, quantize_macroblock, Macroblock, MacroblockWithPosition,
     MutableYUVFrame, YUVFrame, YUVFrameMacroblockIterator, YUYV422Sample,
 }, wpm};

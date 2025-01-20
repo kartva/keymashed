@@ -376,7 +376,7 @@ where
     pub fn send_bytes<'a>(&'a mut self, fill: impl FnOnce(&mut [u8]) -> usize) {
         // Note that the size of the packets we use is less than 10kb, for which
         // https://www.kernel.org/doc/html/v6.3/networking/msg_zerocopy.html
-        // copying is actually faster than MSG_ZEROCOPY.
+        // copying into the kernel is actually faster than MSG_ZEROCOPY.
 
         let packet = &mut self.scratch;
 

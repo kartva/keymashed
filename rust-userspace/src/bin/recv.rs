@@ -1,6 +1,12 @@
+// ----------------------------------------------------------------------------
+// WARNING:
+// Documentation for this code is somewhat poor. This code receives livestream
+// data and displays it on the screen.
+// ----------------------------------------------------------------------------
+
 #![feature(generic_const_exprs)]
 
-use run_louder::*;
+use rust_userspace::*;
 
 use bytes::Buf;
 use sdl2::{self, pixels::{Color, PixelFormatEnum}, rect::Rect};
@@ -15,7 +21,7 @@ struct VideoPacket {
 }
 
 fn main() -> std::io::Result<()> {
-    run_louder::init_logger(false);
+    rust_userspace::init_logger(false);
 
     let (bpf_write_channel, bpf_receive_channel) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
