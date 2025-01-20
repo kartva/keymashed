@@ -419,7 +419,7 @@ where
         self.send_bytes(|mem| {
             let mut data = Payload::mut_from_bytes(mem).unwrap();
             fill(&mut data);
-            size_of_val(&data)
+            size_of_val(data)
         });
     }
 }
