@@ -1,13 +1,18 @@
 [package]
-name = "run-louder"
+name = "rust_userspace"
 version = "0.1.0"
 edition = "2021"
 
 [profile.release]
 debug = true
 
+[[bench]]
+name = "rtp"
+harness = false
+
 [dependencies]
 bytes = "1.8.0"
+criterion = "0.5.1"
 crossterm = "0.28.1"
 fft2d = { version = "0.1.1", features = ["rustdct"] }
 libbpf-sys = "1.5.0"
