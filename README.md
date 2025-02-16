@@ -50,6 +50,8 @@ The repository consists of the following components:
 - a video codec which uses a JPEG-like scheme to lossily compress blocks of frames which are then reassembled and decompressed on the receiver. The quality of the JPEG encoding can vary per block.
 - an RTP-like protocol for receiving packets over UDP.
 
+For supplementary diagrams and technical context, you can also have a look at [this presentation for `keymashed` I created when interviewing at Neuralink](Keymashed%20Presentation.pdf). Note that the presentation originally contained several videos and may be slightly confusing as a PDF. Feel free to contact me for the authoritative PPTX file.
+
 Explanations of each component follow.
 
 ### eBPF Packet Filter
