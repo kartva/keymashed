@@ -227,8 +227,8 @@ If you have ideas around making `screamd`, please contact me or create an issue!
   <img src="media/BURST 2024 SebMur-66-cropped.jpg" width="49%" />
 </p>
 
-# About the author / hire me!
-_I'm looking for Summer 2025 internships - and I'm particularly excited about working with startups._ Read more about my work at [my Github profile](https://github.com/kartva/).
+# About the author
+Read more about my work at [my Github profile](https://github.com/kartva/).
 
 # Credits
 
