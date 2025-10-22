@@ -18,7 +18,7 @@ _What if... you could motivate it. Make the internet itself flow a lil' quicker.
     - [User-level Application](#user-level-application)
   - [Project Evolution](#project-evolution)
 - [Gallery](#gallery)
-- [About the author / hire me!](#about-the-author--hire-me)
+- [About the author](#about-the-author)
 - [Credits](#credits)
 
 ## ✨the keymashed experience✨:
